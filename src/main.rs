@@ -49,10 +49,10 @@ fn get_bbox(points: &Vec<(f64, f64)>) -> BBox {
 struct Intersection {
     t: f64,
     s: f64,
-    side: i8,
+    side: i32,
     other: Option<usize>,
     xy: Option<(f64, f64)>,
-    jump: Option<bool>
+    jump: Option<bool>,
 }
 
 fn pt_in_pl(x: f64, y: f64, x0: f64, y0: f64, x1: f64, y1: f64) -> f64 {
@@ -61,8 +61,12 @@ fn pt_in_pl(x: f64, y: f64, x0: f64, y0: f64, x1: f64, y1: f64) -> f64 {
     (x - x0) * dy - (y - y0) * dx
 }
 
-fn get_side(x: f64, y: f64, x0: f64, y0: f64, x1: f64, y1: f64) ->  i8 {
-  if pt_in_pl(x, y, x0, y0, x1, y1) < 0. { 1} else {-1}
+fn get_side(x: f64, y: f64, x0: f64, y0: f64, x1: f64, y1: f64) -> i32 {
+    if pt_in_pl(x, y, x0, y0, x1, y1) < 0. {
+        1
+    } else {
+        -1
+    }
 }
 
 fn seg_isect(
@@ -98,7 +102,7 @@ fn seg_isect(
             side: get_side(p0x, p0y, p1x, p1y, q0x, q0y),
             other: None,
             xy: Some((p1x * t + p0x * (1. - t), p1y * t + p0y * (1. - t))),
-            jump: None
+            jump: None,
         });
     }
     return None;
@@ -129,201 +133,295 @@ fn poly_bridge(poly0: &Vec<(f64, f64)>, poly1: &Vec<(f64, f64)>) -> Vec<(f64, f6
         .collect()
 }
 #[derive(Debug, Clone)]
-struct Vertex {xy: (f64, f64), isects: Vec<Intersection>, isects_map: HashMap<(usize,usize), Intersection>}
-
-fn build_vertices(poly: &Vec<(f64, f64)>,other: &Vec<(f64, f64)>,out: &mut Vec<Vertex>,oout: &mut Vec<Vertex>,idx: usize, self_isect: bool, has_isect: &mut bool){
-  let n = poly.len();
-  let m = other.len();
-  if self_isect {
-    for i in 0..n{
-      let id = (idx,i);
-      let i1 = (i + 1 + n) % n;
-      let a = poly[i];
-      let b = poly[i1];
-      for j in 0..n {
-        let jd = (idx,j);
-        let j1 = (j + 1 + n) % n;
-        if i == j || i == j1 || i1 == j || i1 == j1 {
-          continue;
-        }
-        let c = poly[j];
-        let d = poly[j1];
-        let xx_opt = if let Some(ox) = out[j].isects_map.get(&id) {
-          Some(Intersection{
-            t: ox.s,
-            s: ox.t,
-            xy: ox.xy,
-            other: None,
-            side: get_side(a.0, a.1, b.0, b.1, c.0, c.1),
-            jump: None
-          })
-        }else{
-          seg_isect(a.0, a.1, b.0, b.1, c.0, c.1, d.0, d.1, None)
-        };
-        if let Some( mut xx) = xx_opt {
-          xx.other = Some(j);
-          xx.jump = Some(false);
-          let p = out.get_mut(i).unwrap();
-          p.isects.push(xx.clone());
-          p.isects_map.insert(jd, xx);
-        }
-      }
-
-    }
-  }
-
-  for i in 0..n {
-    let id = (idx,i);
-    let p = out.get_mut(i).unwrap();
-    let i1 = (i + 1 + n) % n;
-    let a = poly[i];
-    let b = poly[i1];
-    for j in 0..m {
-      let jd = (1-idx,j);
-      let j1 = (j + 1 + m) % m;
-      let c = other[j];
-      let d = other[j1];
-      let xx_opt = if let Some(ox) = oout[j].isects_map.get(&id) {
-        Some(Intersection{
-                  t: ox.s,
-            s: ox.t,
-            xy: ox.xy,
-            other: None,
-            side: get_side(a.0, a.1, b.0, b.1, c.0, c.1),
-            jump: None
-        })
-      } else {
-          seg_isect(a.0, a.1, b.0, b.1, c.0, c.1, d.0, d.1, None)
-      };
-      if let Some( mut xx) = xx_opt {
-        *has_isect = true;
-          xx.other = Some(j);
-          xx.jump = Some(true);
-          p.isects.push(xx.clone());
-          p.isects_map.insert(jd, xx);
-      }
-    }
-    p.isects.sort_by(|a,b| a.t.total_cmp(&b.t));
-  }
+struct Vertex {
+    xy: (f64, f64),
+    isects: Vec<Intersection>,
+    isects_map: HashMap<(usize, usize), Intersection>,
 }
 
-
-fn poly_union(poly0: &Vec<(f64, f64)>,poly1: &Vec<(f64, f64)>,self_isect_opt: Option<bool>) -> Vec<(f64, f64)>{
-    let  self_isect = self_isect_opt.unwrap_or(false);
-  let verts0 = poly0.iter().map(|&xy| (Vertex{xy, isects: Vec::new(), isects_map: HashMap::new()})).collect();
-  let verts1 = poly1.iter().map(|&xy|  (Vertex{xy, isects: Vec::new(), isects_map: HashMap::new()})).collect();
-
-  let has_isect = false;
-
-
-  build_vertices(poly0,poly1,&mut verts0,&mut verts1,0, self_isect, &mut has_isect);
-  build_vertices(poly1,poly0,&mut verts1,&mut verts0,1, self_isect, &mut has_isect);
-
-  if !has_isect {
-    if !self_isect {
-      return poly_bridge(poly0,poly1);
-    }else{
-      return poly_union(&poly_bridge(poly0,poly1),&Vec::new(),Some(true));
-    }
-  }
-
-
-  let mut isect_mir = HashMap::new();
-  fn mirror_isects(verts0:  &mut Vec<Vertex>,verts1:  &mut Vec<Vertex>,idx: usize, isect_mir: &mut HashMap<(usize, usize, i32),(usize, usize, usize)>) {
-    let n = verts0.len();
-    for i in 0..n {
-      let m = verts0[i].isects.len();
-      for j in 0..m {
-        let id = (idx, i, j as i32);
-        let jump = verts0[i].isects[j].jump.unwrap_or(false);
-        let jd = if jump {1-idx} else {idx};
-        let k = verts0[i].isects[j].other.unwrap();
-        let z = (if jump {&verts1} else{ &verts0})[k].isects.iter().position(|x| (x.jump == Some(jump) && x.other == Some(i))).unwrap();
-        isect_mir.insert(id, (jd, k, z));
-      }
-    }
-  }
-  mirror_isects(&mut verts0,&mut verts1,0, &mut isect_mir);
-  mirror_isects(&mut verts1,&mut verts0,1, &mut isect_mir);
-
-
-  fn trace_outline(idx: usize, i0: usize, j0: usize, dir: i8, verts0: &Vec<Vertex>, verts1: &Vec<Vertex>, isect_mir: &HashMap<(usize, usize, i32),(usize, usize, usize)>) {
-    let zero = None;
-    let mut out = Vec::new();
-    fn trace_from(zero: Option<(usize, usize, i32)>, verts0: &Vec<Vertex>, verts1: &Vec<Vertex>, idx: usize, i0: usize, j0: i32, dir: i32, out: &mut Vec<(f64, f64)>, isect_mir: &HashMap<(usize, usize, i32),(usize, usize, usize)>)-> bool {
-      if zero == None {
-        zero = Some((idx, i0, j0));
-      } else if idx == zero.unwrap().0 && i0 == zero.unwrap().1 && j0 == zero.unwrap().2 {
-        return true;
-      }
-      let verts = if idx > 0 {verts1} else {verts0};
-      let n = verts.len();
-      let p = verts[i0];
-      let i1 = (((i0 + n) as i32) +dir) % n.into();
-      if j0 == -1 {
-        out.push(p.xy);
-        if dir < 0 {
-          return trace_from(zero, verts0, verts1, idx,i1, verts[i1].isects.len().into() - 1, dir, out, isect_mir);
-        } else if verts[i0].isects.is_empty() {
-          return trace_from(zero, verts0, verts1, idx,i1,  - 1, dir, out, isect_mir);
-        } else {
-          return trace_from(zero, verts0, verts1, idx,i0,  0, dir, out, isect_mir);
-
-        }
-      } else if j0 >= p.isects.len() as i32 {
-          return trace_from(zero, verts0, verts1, idx,i1,  -1, dir, out, isect_mir);
-
-      } else {
-        out.push(p.isects[j0 as usize].xy.unwrap());
-
-        let q = p.isects[j0 as usize];
-        let (jdx, k, z) = isect_mir[&(idx, i0, j0)];
-        let params;
-        if (q.side * dir < 0) {
-          params = [jdx, k, z - 1, -1];
-        } else {
-          params = [jdx, k, z + 1, 1];
-        }
-        return trace_from(...params);
-      }
-    }
-    let success = trace_from(idx, i0, j0, dir);
-    if (!success || out.len() < 3) {
-      return None;
-    }
-    return out;
-  }
-
-  let xmin = Infinity;
-  let amin = None;
-  for i in 0..poly0.len(){
-    if (poly0[i][0] < xmin) {
-      xmin = poly0[i][0];
-      amin = [0,i];
-    }
-  }
-  for i in 0..poly1.len(){
-    if (poly1[i][0] < xmin) {
-      xmin = poly1[i][0];
-      amin = [1,i];
-    }
-  }
-
-  fn check_concavity(poly, idx) {
+fn build_vertices(
+    poly: &Vec<(f64, f64)>,
+    other: &Vec<(f64, f64)>,
+    out: &mut Vec<Vertex>,
+    oout: &mut Vec<Vertex>,
+    idx: usize,
+    self_isect: bool,
+    has_isect: &mut bool,
+) {
     let n = poly.len();
-    let a = poly[(idx - 1 + n) % n];
-    let b = poly[idx];
-    let c = poly[(idx + 1) % n];
-    let cw = pt_in_pl(...a, ...b, ...c) < 0 ? 1 : -1;
-    return cw;
-  }
+    let m = other.len();
+    if self_isect {
+        for i in 0..n {
+            let id = (idx, i);
+            let i1 = (i + 1 + n) % n;
+            let a = poly[i];
+            let b = poly[i1];
+            for j in 0..n {
+                let jd = (idx, j);
+                let j1 = (j + 1 + n) % n;
+                if i == j || i == j1 || i1 == j || i1 == j1 {
+                    continue;
+                }
+                let c = poly[j];
+                let d = poly[j1];
+                let xx_opt = if let Some(ox) = out[j].isects_map.get(&id) {
+                    Some(Intersection {
+                        t: ox.s,
+                        s: ox.t,
+                        xy: ox.xy,
+                        other: None,
+                        side: get_side(a.0, a.1, b.0, b.1, c.0, c.1),
+                        jump: None,
+                    })
+                } else {
+                    seg_isect(a.0, a.1, b.0, b.1, c.0, c.1, d.0, d.1, None)
+                };
+                if let Some(mut xx) = xx_opt {
+                    xx.other = Some(j);
+                    xx.jump = Some(false);
+                    let p = out.get_mut(i).unwrap();
+                    p.isects.push(xx.clone());
+                    p.isects_map.insert(jd, xx);
+                }
+            }
+        }
+    }
 
-  let cw = check_concavity(amin[0]?poly1:poly0, amin[1]);
-  let ret = trace_outline(...amin, -1, cw, true);
-  if (!ret) {
-    return [];
-  }
-  return ret;
+    for i in 0..n {
+        let id = (idx, i);
+        let p = out.get_mut(i).unwrap();
+        let i1 = (i + 1 + n) % n;
+        let a = poly[i];
+        let b = poly[i1];
+        for j in 0..m {
+            let jd = (1 - idx, j);
+            let j1 = (j + 1 + m) % m;
+            let c = other[j];
+            let d = other[j1];
+            let xx_opt = if let Some(ox) = oout[j].isects_map.get(&id) {
+                Some(Intersection {
+                    t: ox.s,
+                    s: ox.t,
+                    xy: ox.xy,
+                    other: None,
+                    side: get_side(a.0, a.1, b.0, b.1, c.0, c.1),
+                    jump: None,
+                })
+            } else {
+                seg_isect(a.0, a.1, b.0, b.1, c.0, c.1, d.0, d.1, None)
+            };
+            if let Some(mut xx) = xx_opt {
+                *has_isect = true;
+                xx.other = Some(j);
+                xx.jump = Some(true);
+                p.isects.push(xx.clone());
+                p.isects_map.insert(jd, xx);
+            }
+        }
+        p.isects.sort_by(|a, b| a.t.total_cmp(&b.t));
+    }
+}
+
+fn poly_union(
+    poly0: &Vec<(f64, f64)>,
+    poly1: &Vec<(f64, f64)>,
+    self_isect_opt: Option<bool>,
+) -> Vec<(f64, f64)> {
+    let self_isect = self_isect_opt.unwrap_or(false);
+    let mut verts0 = poly0
+        .iter()
+        .map(|&xy| {
+            (Vertex {
+                xy,
+                isects: Vec::new(),
+                isects_map: HashMap::new(),
+            })
+        })
+        .collect();
+    let mut verts1 = poly1
+        .iter()
+        .map(|&xy| {
+            (Vertex {
+                xy,
+                isects: Vec::new(),
+                isects_map: HashMap::new(),
+            })
+        })
+        .collect();
+
+    let mut has_isect = false;
+
+    build_vertices(
+        poly0,
+        poly1,
+        &mut verts0,
+        &mut verts1,
+        0,
+        self_isect,
+        &mut has_isect,
+    );
+    build_vertices(
+        poly1,
+        poly0,
+        &mut verts1,
+        &mut verts0,
+        1,
+        self_isect,
+        &mut has_isect,
+    );
+
+    if !has_isect {
+        if !self_isect {
+            return poly_bridge(poly0, poly1);
+        } else {
+            return poly_union(&poly_bridge(poly0, poly1), &Vec::new(), Some(true));
+        }
+    }
+
+    let mut isect_mir = HashMap::new();
+    fn mirror_isects(
+        verts0: &mut Vec<Vertex>,
+        verts1: &mut Vec<Vertex>,
+        idx: usize,
+        isect_mir: &mut HashMap<(usize, usize, i32), (usize, usize, i32)>,
+    ) {
+        let n = verts0.len();
+        for i in 0..n {
+            let m = verts0[i].isects.len();
+            for j in 0..m {
+                let id = (idx, i, j as i32);
+                let jump = verts0[i].isects[j].jump.unwrap_or(false);
+                let jd = if jump { 1 - idx } else { idx };
+                let k = verts0[i].isects[j].other.unwrap();
+                let z = (if jump { &verts1 } else { &verts0 })[k]
+                    .isects
+                    .iter()
+                    .position(|x| (x.jump == Some(jump) && x.other == Some(i)))
+                    .unwrap();
+                isect_mir.insert(id, (jd, k, z as i32));
+            }
+        }
+    }
+    mirror_isects(&mut verts0, &mut verts1, 0, &mut isect_mir);
+    mirror_isects(&mut verts1, &mut verts0, 1, &mut isect_mir);
+
+    fn trace_outline(
+        idx: usize,
+        i0: usize,
+        j0: i32,
+        dir: i32,
+        verts0: &Vec<Vertex>,
+        verts1: &Vec<Vertex>,
+        isect_mir: &HashMap<(usize, usize, i32), (usize, usize, i32)>,
+    ) -> Option<Vec<(f64, f64)>> {
+        fn trace_from(
+            mut zero: Option<(usize, usize, i32)>,
+            verts0: &Vec<Vertex>,
+            verts1: &Vec<Vertex>,
+            idx: usize,
+            i0: usize,
+            j0: i32,
+            dir: i32,
+            out: &mut Vec<(f64, f64)>,
+            isect_mir: &HashMap<(usize, usize, i32), (usize, usize, i32)>,
+        ) -> bool {
+            if zero == None {
+                zero = Some((idx, i0, j0));
+            } else if idx == zero.unwrap().0 && i0 == zero.unwrap().1 && j0 == zero.unwrap().2 {
+                return true;
+            }
+            let verts = if idx > 0 { verts1 } else { verts0 };
+            let n = verts.len();
+            let p = &verts[i0];
+            let i1 = (((i0 + n) as i32) + dir) as usize % n;
+            if j0 == -1 {
+                out.push(p.xy);
+                if dir < 0 {
+                    return trace_from(
+                        zero,
+                        verts0,
+                        verts1,
+                        idx,
+                        i1,
+                        verts[i1].isects.len() as i32 - 1,
+                        dir,
+                        out,
+                        isect_mir,
+                    );
+                } else if verts[i0].isects.is_empty() {
+                    return trace_from(zero, verts0, verts1, idx, i1, -1, dir, out, isect_mir);
+                } else {
+                    return trace_from(zero, verts0, verts1, idx, i0, 0, dir, out, isect_mir);
+                }
+            } else if j0 >= p.isects.len() as i32 {
+                return trace_from(zero, verts0, verts1, idx, i1, -1, dir, out, isect_mir);
+            } else {
+                out.push(p.isects[j0 as usize].xy.unwrap());
+
+                let q = &p.isects[j0 as usize];
+                let (jdx, k, z) = isect_mir[&(idx, i0, j0)];
+                if q.side * dir < 0 {
+                    return trace_from(
+                        zero,
+                        verts0,
+                        verts1,
+                        jdx,
+                        k,
+                        (z - 1) as i32,
+                        -1,
+                        out,
+                        isect_mir,
+                    );
+                }
+                return trace_from(
+                    zero,
+                    verts0,
+                    verts1,
+                    jdx,
+                    k,
+                    (z + 1) as i32,
+                    1,
+                    out,
+                    isect_mir,
+                );
+            }
+        }
+        let zero = None;
+        let mut out = Vec::new();
+        let success = trace_from(zero, verts0, verts1, idx, i0, j0, dir, &mut out, isect_mir);
+        if !success || out.len() < 3 {
+            return None;
+        }
+        Some(out)
+    }
+
+    let mut xmin = f64::INFINITY;
+    let mut amin = (0, 0);
+    for i in 0..poly0.len() {
+        if poly0[i].0 < xmin {
+            xmin = poly0[i].0;
+            amin = (0, i);
+        }
+    }
+    for i in 0..poly1.len() {
+        if poly1[i].0 < xmin {
+            xmin = poly1[i].0;
+            amin = (1, i);
+        }
+    }
+
+    fn check_concavity(poly: &Vec<(f64, f64)>, idx: usize) -> i32 {
+        let n = poly.len();
+        let a = poly[(idx - 1 + n) % n];
+        let b = poly[idx];
+        let c = poly[(idx + 1) % n];
+        let cw = get_side(a.0, a.1, b.0, b.1, c.0, c.1);
+        return cw;
+    }
+
+    let cw = check_concavity(if amin.0 != 0 { &poly1 } else { &poly0 }, amin.1);
+    let outline = trace_outline(amin.0, amin.1, -1, cw, &verts0, &verts1, &isect_mir);
+    outline.unwrap_or_else(|| Vec::new())
 }
 /*
 
