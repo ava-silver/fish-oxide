@@ -8,7 +8,7 @@ use std::{
 
 static JSR: AtomicU64 = AtomicU64::new(0x5EED);
 
-fn rand() -> u64 {
+pub fn rand() -> u64 {
     let mut reg = JSR.load(Ordering::Acquire);
     reg ^= reg << 17;
     reg ^= reg >> 13;
@@ -24,13 +24,13 @@ const PERLIN_ZWRAP: u64 = 1 << PERLIN_ZWRAPB;
 const PERLIN_SIZE: u64 = 4095;
 const PERLIN_OCTAVES: u64 = 4;
 const PERLIN_AMP_FALLOFF: f64 = 0.5;
-fn scaled_cosine(i: f64) -> f64 {
+pub fn scaled_cosine(i: f64) -> f64 {
     return 0.5 * (1.0 - f64::cos(i * PI));
 }
 
 static PERLIN: LazyLock<Vec<u64>> = LazyLock::new(|| (0..=PERLIN_SIZE).map(|_| rand()).collect());
 
-fn noise(mut x: f64, y_opt: Option<f64>, z_opt: Option<f64>) -> f64 {
+pub fn noise(mut x: f64, y_opt: Option<f64>, z_opt: Option<f64>) -> f64 {
     x = x.abs();
     let y = y_opt.unwrap_or(0.).abs();
     let z = z_opt.unwrap_or(0.).abs();

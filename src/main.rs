@@ -1,30 +1,35 @@
 use core::f64;
-use std::collections::HashMap;
+use core::f64::consts::{E, PI};
+use std::cmp::Ordering;
+use std::iter::successors;
+use std::{collections::HashMap, default};
 
 pub mod rand;
+
+use rand::rand;
 
 fn main() {
     println!("Hello, world!");
 }
 
-fn dist(x0: f64, y0: f64, x1: f64, y1: f64) -> f64 {
+fn dist((x0, y0): (f64, f64), (x1, y1): (f64, f64)) -> f64 {
     ((x1 - x0).powi(2) + (y1 - y0).powi(2)).sqrt()
 }
 fn lerp(a: f64, b: f64, t: f64) -> f64 {
     a * (1. - t) + b * t
 }
-fn lerp2d(x0: f64, y0: f64, x1: f64, y1: f64, t: f64) -> (f64, f64) {
+fn lerp2d((x0, y0): (f64, f64), (x1, y1): (f64, f64), t: f64) -> (f64, f64) {
     (x0 * (1. - t) + x1 * t, y0 * (1. - t) + y1 * t)
 }
 
-struct BBox {
+struct BoundingBox {
     x: f64,
     y: f64,
     w: f64,
     h: f64,
 }
 
-fn get_bbox(points: &Vec<(f64, f64)>) -> BBox {
+fn get_boundingbox(points: &Vec<(f64, f64)>) -> BoundingBox {
     let mut xmin = f64::INFINITY;
     let mut ymin = f64::INFINITY;
     let mut xmax = -f64::INFINITY;
@@ -37,7 +42,7 @@ fn get_bbox(points: &Vec<(f64, f64)>) -> BBox {
         ymax = ymax.max(y);
     }
 
-    BBox {
+    BoundingBox {
         x: xmin,
         y: ymin,
         w: xmax - xmin,
@@ -55,14 +60,18 @@ struct Intersection {
     jump: Option<bool>,
 }
 
-fn pt_in_pl(x: f64, y: f64, x0: f64, y0: f64, x1: f64, y1: f64) -> f64 {
+fn sort_intersections(intersections: &mut Vec<Intersection>) {
+    intersections.sort_by(|a, b| a.t.total_cmp(&b.t));
+}
+
+fn pt_in_pl((x, y): (f64, f64), (x0, y0): (f64, f64), (x1, y1): (f64, f64)) -> f64 {
     let dx = x1 - x0;
     let dy = y1 - y0;
     (x - x0) * dy - (y - y0) * dx
 }
 
-fn get_side(x: f64, y: f64, x0: f64, y0: f64, x1: f64, y1: f64) -> i32 {
-    if pt_in_pl(x, y, x0, y0, x1, y1) < 0. {
+fn get_side((x, y): (f64, f64), (x0, y0): (f64, f64), (x1, y1): (f64, f64)) -> i32 {
+    if pt_in_pl((x, y), (x0, y0), (x1, y1)) < 0. {
         1
     } else {
         -1
@@ -70,14 +79,10 @@ fn get_side(x: f64, y: f64, x0: f64, y0: f64, x1: f64, y1: f64) -> i32 {
 }
 
 fn seg_isect(
-    p0x: f64,
-    p0y: f64,
-    p1x: f64,
-    p1y: f64,
-    q0x: f64,
-    q0y: f64,
-    q1x: f64,
-    q1y: f64,
+    (p0x, p0y): (f64, f64),
+    (p1x, p1y): (f64, f64),
+    (q0x, q0y): (f64, f64),
+    (q1x, q1y): (f64, f64),
     is_ray_opt: Option<bool>,
 ) -> Option<Intersection> {
     let is_ray = is_ray_opt.unwrap_or(false);
@@ -99,7 +104,7 @@ fn seg_isect(
         return Some(Intersection {
             t,
             s,
-            side: get_side(p0x, p0y, p1x, p1y, q0x, q0y),
+            side: get_side((p0x, p0y), (p1x, p1y), (q0x, q0y)),
             other: None,
             xy: Some((p1x * t + p0x * (1. - t), p1y * t + p0y * (1. - t))),
             jump: None,
@@ -170,11 +175,11 @@ fn build_vertices(
                         s: ox.t,
                         xy: ox.xy,
                         other: None,
-                        side: get_side(a.0, a.1, b.0, b.1, c.0, c.1),
+                        side: get_side(a, b, c),
                         jump: None,
                     })
                 } else {
-                    seg_isect(a.0, a.1, b.0, b.1, c.0, c.1, d.0, d.1, None)
+                    seg_isect(a, b, c, d, None)
                 };
                 if let Some(mut xx) = xx_opt {
                     xx.other = Some(j);
@@ -204,11 +209,11 @@ fn build_vertices(
                     s: ox.t,
                     xy: ox.xy,
                     other: None,
-                    side: get_side(a.0, a.1, b.0, b.1, c.0, c.1),
+                    side: get_side(a, b, c),
                     jump: None,
                 })
             } else {
-                seg_isect(a.0, a.1, b.0, b.1, c.0, c.1, d.0, d.1, None)
+                seg_isect(a, b, c, d, None)
             };
             if let Some(mut xx) = xx_opt {
                 *has_isect = true;
@@ -218,7 +223,7 @@ fn build_vertices(
                 p.isects_map.insert(jd, xx);
             }
         }
-        p.isects.sort_by(|a, b| a.t.total_cmp(&b.t));
+        sort_intersections(&mut p.isects);
     }
 }
 
@@ -230,22 +235,18 @@ fn poly_union(
     let self_isect = self_isect_opt.unwrap_or(false);
     let mut verts0 = poly0
         .iter()
-        .map(|&xy| {
-            (Vertex {
-                xy,
-                isects: Vec::new(),
-                isects_map: HashMap::new(),
-            })
+        .map(|&xy| Vertex {
+            xy,
+            isects: Vec::new(),
+            isects_map: HashMap::new(),
         })
         .collect();
     let mut verts1 = poly1
         .iter()
-        .map(|&xy| {
-            (Vertex {
-                xy,
-                isects: Vec::new(),
-                isects_map: HashMap::new(),
-            })
+        .map(|&xy| Vertex {
+            xy,
+            isects: Vec::new(),
+            isects_map: HashMap::new(),
         })
         .collect();
 
@@ -415,7 +416,7 @@ fn poly_union(
         let a = poly[(idx - 1 + n) % n];
         let b = poly[idx];
         let c = poly[(idx + 1) % n];
-        let cw = get_side(a.0, a.1, b.0, b.1, c.0, c.1);
+        let cw = get_side(a, b, c);
         return cw;
     }
 
@@ -423,139 +424,205 @@ fn poly_union(
     let outline = trace_outline(amin.0, amin.1, -1, cw, &verts0, &verts1, &isect_mir);
     outline.unwrap_or_else(|| Vec::new())
 }
+
+fn seg_isect_poly(
+    p0: (f64, f64),
+    p1: (f64, f64),
+    poly: &Vec<(f64, f64)>,
+    is_ray_opt: Option<bool>,
+) -> Vec<Intersection> {
+    let is_ray = is_ray_opt.unwrap_or(false);
+    let n = poly.len();
+    let mut isects = Vec::new();
+    for i in 0..poly.len() {
+        let a = poly[i];
+        let b = poly[(i + 1) % n];
+
+        if let Some(xx) = seg_isect(p0, p1, a, b, Some(is_ray)) {
+            isects.push(xx);
+        }
+    }
+    sort_intersections(&mut isects);
+    isects
+}
+
+#[derive(Default)]
+struct ClipSegments {
+    clip: Vec<Vec<(f64, f64)>>,
+    dont_clip: Vec<Vec<(f64, f64)>>,
+}
+
+impl ClipSegments {
+    fn new_with_empty() -> Self {
+        ClipSegments {
+            clip: vec![vec![]],
+            dont_clip: vec![vec![]],
+        }
+    }
+    fn extend(&mut self, other: Self) {
+        self.clip.extend(other.clip.into_iter());
+        self.dont_clip.extend(other.dont_clip.into_iter());
+    }
+    fn filter_empty(mut self) -> Self {
+        self.clip = self.clip.into_iter().filter(|l| !l.is_empty()).collect();
+        self.dont_clip = self
+            .dont_clip
+            .into_iter()
+            .filter(|l| !l.is_empty())
+            .collect();
+        self
+    }
+    fn get(&self, clip: bool) -> &Vec<Vec<(f64, f64)>> {
+        if clip {
+            &self.clip
+        } else {
+            &self.dont_clip
+        }
+    }
+
+    fn get_mut(&mut self, clip: bool) -> &mut Vec<Vec<(f64, f64)>> {
+        if clip {
+            &mut self.clip
+        } else {
+            &mut self.dont_clip
+        }
+    }
+}
+
+fn clip(polyline: &Vec<(f64, f64)>, polygon: &Vec<(f64, f64)>) -> ClipSegments {
+    if (polyline.is_empty()) {
+        return ClipSegments::default();
+    }
+    let zero = seg_isect_poly(
+        polyline[0],
+        (polyline[0].0 + E, polyline[0].1 + PI),
+        polygon,
+        Some(true),
+    )
+    .len()
+        % 2
+        != 0;
+    let mut out = ClipSegments::new_with_empty();
+    let mut io = zero;
+    for i in 0..polyline.len() {
+        let a = polyline[i];
+        let b_opt = polyline.get(i + 1);
+        let idx = out.get(io).len() - 1;
+        out.get_mut(io)[idx].push(a);
+        let Some(&b) = b_opt else {
+            break;
+        };
+
+        let isects = seg_isect_poly(a, b, polygon, Some(false));
+        for j in 0..isects.len() {
+            let idx = out.get(io).len() - 1;
+            out.get_mut(io)[idx].push(isects[j].xy.unwrap());
+            io = !io;
+            out.get_mut(io).push(vec![isects[j].xy.unwrap()]);
+        }
+    }
+    out.filter_empty()
+}
+
+fn clip_multi(
+    polylines: &Vec<Vec<(f64, f64)>>,
+    polygon: &Vec<(f64, f64)>,
+    clipper_func_opt: Option<fn(&Vec<(f64, f64)>, &Vec<(f64, f64)>) -> ClipSegments>,
+) -> ClipSegments {
+    let clipper_func = clipper_func_opt.unwrap_or(clip);
+    let mut out = ClipSegments::default();
+    for polyline in polylines {
+        out.extend(clipper_func(polyline, polygon));
+    }
+    return out;
+}
+
+fn binclip(polyline: &Vec<(f64, f64)>, func: fn((f64, f64), usize) -> bool) -> ClipSegments {
+    if (polyline.is_empty()) {
+        return ClipSegments::default();
+    }
+    let mut bins = Vec::new();
+    for i in 0..polyline.len() {
+        let t = i / (polyline.len() - 1);
+        bins.push(func(polyline[i], t));
+    }
+    let zero = bins[0];
+    let mut out = ClipSegments::new_with_empty();
+    let mut io = zero;
+    for i in 0..polyline.len() {
+        let a = polyline[i];
+        let b_opt = polyline.get(i + 1);
+        let idx = out.get(io).len() - 1;
+        out.get_mut(io)[idx].push(a);
+        let Some(&b) = b_opt else {
+            break;
+        };
+
+        let do_isect = bins[i] != bins[i + 1];
+
+        if do_isect {
+            let pt = lerp2d(a, b, 0.5);
+            let idx = out.get(io).len() - 1;
+            out.get_mut(io)[idx].push(pt);
+            io = !io;
+            out.get_mut(io).push(vec![pt]);
+        }
+    }
+    out.filter_empty()
+}
+
+fn trsl_poly(poly: &Vec<(f64, f64)>, x: f64, y: f64) -> Vec<(f64, f64)> {
+    return poly.iter().map(|(x0, y0)| (x0 + x, y0 + y)).collect();
+}
+
+fn shade_shape(
+    poly: &Vec<(f64, f64)>,
+    step_opt: Option<f64>,
+    dx_opt: Option<f64>,
+    dy_opt: Option<f64>,
+) -> Vec<Vec<(f64, f64)>> {
+    let step = step_opt.unwrap_or(5.);
+    let dx = dx_opt.unwrap_or(10.);
+    let dy = dy_opt.unwrap_or(20.);
+    let mut bbox = get_boundingbox(poly);
+    bbox.x -= step;
+    bbox.y -= step;
+    bbox.w += step * 2.;
+    bbox.h += step * 2.;
+    let mut lines: Vec<_> = successors(Some(-bbox.h), |i| {
+        let next = i + step;
+        (next < bbox.w).then_some(next)
+    })
+    .map(|i| vec![(bbox.x + i, bbox.y), (bbox.x + i + bbox.h, bbox.y + bbox.h)])
+    .collect();
+
+    lines = clip_multi(&lines, poly, None).clip;
+
+    let carve = trsl_poly(poly, -dx, -dy);
+
+    lines = clip_multi(&lines, &carve, None).dont_clip;
+
+    for i in 0..lines.len() {
+        let line = &lines[i];
+        let mut a = line[0];
+        let mut b = line[1];
+        let s = (rand() as f64) * 0.5;
+        if dy > 0. {
+            a = lerp2d(a, b, s);
+            lines[i][0] = a;
+        } else {
+            b = lerp2d(b, a, s);
+            lines[i][1] = b;
+        }
+    }
+
+    lines
+}
+
 /*
 
-fn seg_isect_poly(x0,y0,x1,y1,poly,is_ray=false){
-  let n = poly.len();
-  let isects = [];
-  for i in 0..poly.len(); i++){
-    let a = poly[i];
-    let b = poly[(i+1)%n];
-    let xx = seg_isect(x0,y0,x1,y1,...a,...b,is_ray);
-    if (xx){
-      isects.push(xx);
-    }
-  }
-  isects.sort((a,b)=>a.t-b.t);
-  return isects;
-}
-
-
-fn clip(polyline,polygon){
-  if (!polyline.len()){
-    return {true:[],false:[]};
-  }
-  let zero = seg_isect_poly(...polyline[0],polyline[0][0]+Math.E,polyline[0][1]+PI,polygon,true).len() % 2 != 0;
-  let out = {
-    'true' :[[]],
-    'false':[[]],
-  }
-  let io = zero;
-  for i in 0..polyline.len(); i++){
-    let a= polyline[i];
-    let b= polyline[i+1];
-    out[io][out[io].len()-1].push(a);
-    if (!b) break;
-
-    let isects = seg_isect_poly(...a,...b,polygon,false);
-    for j in 0..isects.len(); j++){
-      out[io][out[io].len()-1].push(isects[j].xy);
-      io = !io;
-      out[io].push([isects[j].xy]);
-    }
-  }
-  out.true = out.true.filter(x=>x.len());
-  out.false = out.false.filter(x=>x.len());
-  return out;
-}
-
-fn clip_multi(polylines,polygon,clipper_func=clip){
-  let out = {
-    true:[],
-    false:[],
-  };
-  for i in 0..polylines.len(); i++){
-    let c = clipper_func(polylines[i],polygon);
-    out.true.push(...c.true);
-    out.false.push(...c.false);
-  }
-  return out;
-}
-
-fn binclip(polyline,func){
-  if (!polyline.len()){
-    return {true:[],false:[]};
-  }
-  let bins = [];
-  for i in 0..polyline.len(); i++){
-    let t = i/(polyline.len()-1);
-    bins.push(func(...polyline[i],t));
-  }
-  let zero = bins[0];
-  let out = {
-    'true' :[[]],
-    'false':[[]],
-  }
-  let io = zero;
-  for i in 0..polyline.len(); i++){
-    let a= polyline[i];
-    let b= polyline[i+1];
-    out[io][out[io].len()-1].push(a);
-    if (!b) break;
-
-    let do_isect = bins[i] != bins[i+1];
-
-    if (do_isect){
-      let pt = lerp2d(...a,...b,0.5);
-      out[io][out[io].len()-1].push(pt);
-      io = !io;
-      out[io].push([pt]);
-    }
-  }
-  out.true = out.true.filter(x=>x.len());
-  out.false = out.false.filter(x=>x.len());
-  return out;
-}
-
-
-fn shade_shape(poly,step=5,dx=10,dy=20){
-  let bbox = get_bbox(poly);
-  bbox.x -= step;
-  bbox.y -= step;
-  bbox.w += step*2;
-  bbox.h += step*2;
-  let lines = [];
-  for i in -bbox.h; i < bbox.w; i+=step){
-    let x0 = bbox.x + i;
-    let y0 = bbox.y;
-    let x1 = bbox.x + i + bbox.h;
-    let y1 = bbox.y + bbox.h;
-    lines.push([[x0,y0],[x1,y1]]);
-  }
-  lines = clip_multi(lines,poly).true;
-
-  let carve = trsl_poly(poly,-dx,-dy);
-
-  lines = clip_multi(lines,carve).false;
-
-  for i in 0..lines.len(); i++){
-    let [a,b] = lines[i];
-    let s = rand()*0.5;
-    if (dy > 0){
-      a = lerp2d(...a,...b,s);
-      lines[i][0] = a;
-    }else{
-      b = lerp2d(...b,...a,s);
-      lines[i][1] = b;
-    }
-  }
-
-  return lines;
-}
-
-
 fn fill_shape(poly,step=5){
-  let bbox = get_bbox(poly);
+  let bbox = get_boundingbox(poly);
   bbox.x -= step;
   bbox.y -= step;
   bbox.w += step*2;
@@ -568,12 +635,12 @@ fn fill_shape(poly,step=5){
     let y1 = bbox.y + bbox.h;
     lines.push([[x0,y0],[x1,y1]]);
   }
-  lines = clip_multi(lines,poly).true;
+  lines = clip_multi(lines,poly).clip;
   return lines;
 }
 
 fn patternshade_shape(poly,step=5,pattern_func){
-  let bbox = get_bbox(poly);
+  let bbox = get_boundingbox(poly);
   bbox.x -= step;
   bbox.y -= step;
   bbox.w += step*2;
@@ -586,26 +653,26 @@ fn patternshade_shape(poly,step=5,pattern_func){
     let y1 = bbox.y + bbox.h;
     lines.push([[x0,y0],[x1,y1]]);
   }
-  lines = clip_multi(lines,poly).true;
+  lines = clip_multi(lines,poly).clip;
 
   for i in 0..lines.len(); i++){
     lines[i] = resample(lines[i],2);
   }
 
-  lines = clip_multi(lines,pattern_func,binclip).true;
+  lines = clip_multi(lines,pattern_func,binclip).clip;
 
   return lines;
 }
 
 
 fn vein_shape(poly,n=50){
-  let bbox = get_bbox(poly);
+  let bbox = get_boundingbox(poly);
   let out = [];
   for i in 0..n; i++){
     let x = bbox.x + rand()*bbox.w;
     let y = bbox.y + rand()*bbox.h;
     let o = [[x,y]];
-    for j in 0..15; j++){
+    for j in 0..15 {
       let dx = (noise(x*0.1,y*0.1,7)-0.5)*4;
       let dy = (noise(x*0.1,y*0.1,6)-0.5)*4;
       x += dx;
@@ -614,13 +681,13 @@ fn vein_shape(poly,n=50){
     }
     out.push(o);
   }
-  out = clip_multi(out,poly).true;
+  out = clip_multi(out,poly).clip;
   return out;
 }
 
 fn smalldot_shape(poly,scale=1){
   let samples = [];
-  let bbox = get_bbox(poly);
+  let bbox = get_boundingbox(poly);
   poissondisk(bbox.w,bbox.h,5*scale,samples);
   for i in 0..samples.len(); i++){
     samples[i][0] += bbox.x;
@@ -637,7 +704,7 @@ fn smalldot_shape(poly,scale=1){
     }
     for k in 0; k < 2; k++){
       let o = [];
-      for j in 0..n; j++){
+      for j in 0..n {
         let t = j/(n-1);
         let a = t * PI * 2;
         o.push([
@@ -650,7 +717,7 @@ fn smalldot_shape(poly,scale=1){
     }
 
   }
-  return clip_multi(out,poly).true;
+  return clip_multi(out,poly).clip;
 }
 
 fn isect_circ_line(cx,cy,r,x0,y0,x1,y1){
@@ -700,7 +767,7 @@ fn resample(polyline,step){
     let rest = (n*step)/d;
     let rpx = a[0] * (1-rest) + b[0] * rest;
     let rpy = a[1] * (1-rest) + b[1] * rest;
-    for j in 1; j <= n; j++){
+    for j in 1; j <= n {
       let t = j/n;
       let x = a[0]*(1-t) + rpx*t;
       let y = a[1]*(1-t) + rpy*t;
@@ -712,7 +779,7 @@ fn resample(polyline,step){
     }
 
     next = None;
-    for j in i+2; j < polyline.len(); j++){
+    for j in i+2; j < polyline.len() {
       let b = polyline[j-1];
       let c = polyline[j];
       if (b[0] == c[0] && b[1] == c[1]){
@@ -978,8 +1045,8 @@ fn pow(a,b){
 }
 
 fn gauss2d(x, y){
-  let z0 = Math.exp(-0.5*x*x);
-  let z1 = Math.exp(-0.5*y*y);
+  let z0 = exp(-0.5*x*x);
+  let z1 = exp(-0.5*y*y);
   return z0*z1;
  }
 
@@ -1017,9 +1084,6 @@ fn squama(w,h,m=3) {
   return q;
 }
 
-fn trsl_poly(poly,x,y){
-  return poly.map(xy=>[xy[0]+x,xy[1]+y]);
-}
 fn scl_poly(poly,sx,sy){
   if (sy === undefined) sy = sx;
   return poly.map(xy=>[xy[0]*sx,xy[1]*sy]);
@@ -1087,7 +1151,7 @@ fn squama_mesh(m,n,uw,uh,squama_func,noise_x,noise_y,interclip=true){
         out.push(...p);
       }else{
         if (clipper){
-          out.push(...clip_multi(p,clipper).false);
+          out.push(...clip_multi(p,clipper).dont_clip);
           clipper = poly_union(clipper,q);
         }else{
           out.push(...p);
@@ -1116,7 +1180,7 @@ fn squama_mesh(m,n,uw,uh,squama_func,noise_x,noise_y,interclip=true){
         out.push(...p);
       }else{
         if (clipper){
-          out.push(...clip_multi(p,clipper).false);
+          out.push(...clip_multi(p,clipper).dont_clip);
           clipper = poly_union(clipper,q);
         }else{
           out.push(...p);
@@ -1175,7 +1239,7 @@ fn fish_body_a(curve0,curve1,scale_scale,pattern_func){
   let outline2 = curve0.concat(curve2.slice().reverse());
   let outline3 = curve0.concat(curve3.slice().reverse());
 
-  let bbox = get_bbox(curve0.concat(curve1));
+  let bbox = get_boundingbox(curve0.concat(curve1));
   let m = ~~(bbox.w/(scale_scale*15));
   let n = ~~(bbox.h/(scale_scale*15));
   let uw = bbox.w/m;
@@ -1185,9 +1249,9 @@ fn fish_body_a(curve0,curve1,scale_scale,pattern_func){
   let sq = squama_mesh(m,n+3,uw,uh,fn,uw*3,uh*3,true).map(a=>trsl_poly(a,bbox.x,bbox.y-uh*1.5));
   let o0 = clip_multi(sq,outline2)[true];
   let o1 = clip_multi(o0,outline3);
-  o1.false = o1.false.filter(x=>rand()<0.6);
+  o1.dont_clip = o1.dont_clip.filter(x=>rand()<0.6);
   let o = [];
-  o.push(curve0,curve1.slice().reverse(),...o1.true,...o1.false);
+  o.push(curve0,curve1.slice().reverse(),...o1.clip,...o1.dont_clip);
   return o;
 }
 
@@ -1199,7 +1263,7 @@ fn fish_body_b(curve0,curve1,scale_scale,pattern_func){
   let outline1 = curve0.concat(curve1.slice().reverse());
   let outline2 = curve0.concat(curve2.slice().reverse());
 
-  let bbox = get_bbox(curve0.concat(curve1));
+  let bbox = get_boundingbox(curve0.concat(curve1));
   let m = ~~(bbox.w/(scale_scale*5));
   let n = ~~(bbox.h/(scale_scale*5));
   let uw = bbox.w/m;
@@ -1251,7 +1315,7 @@ fn fish_body_c(curve0,curve1,scale_scale){
   let outline1 = curve0.concat(curve1.slice().reverse());
   let outline2 = curve0.concat(curve2.slice().reverse());
 
-  let bbox = get_bbox(curve0.concat(curve1));
+  let bbox = get_boundingbox(curve0.concat(curve1));
   bbox.x -= step;
   bbox.y -= step;
   bbox.w += step*2;
@@ -1290,7 +1354,7 @@ fn fish_body_c(curve0,curve1,scale_scale){
 
   let o0 = clip_multi(lines,outline2)[true];
 
-  o0 = clip_multi(o0,(x,y,t)=>(rand()>t||rand()>t),binclip).true;
+  o0 = clip_multi(o0,(x,y,t)=>(rand()>t||rand()>t),binclip).clip;
 
 
   let o = [];
@@ -1332,9 +1396,9 @@ fn fish_body_d(curve0,curve1,scale_scale){
 
     o1.push(...binclip(o0[i],(x,y,t)=>(
       (rand()>Math.cos(t*PI) && rand() < x/500) || (rand()>Math.cos(t*PI) && rand() < x/500)
-    )).true);
+    )).clip);
   }
-  o1 = clip_multi(o1,outline1).true;
+  o1 = clip_multi(o1,outline1).clip;
 
   let sh = vein_shape(outline1);
 
@@ -1511,7 +1575,7 @@ fn fin_b(curve,ang0,ang1,func,dark=1){
     let clipper = out0[0];
     out4.push(out0[0])
     for i in 1; i < out0.len(); i++){
-      out4.push(...clip(out0[i],clipper).false);
+      out4.push(...clip(out0[i],clipper).dont_clip);
       clipper = poly_union(clipper,out0[i]);
     }
   }
@@ -1601,9 +1665,9 @@ fn fin_adipose(curve,dx,dy,r){
     out0[i][1] += (noise(x*0.01,y*0.01)-0.5)*s*50;
   }
   let cc = out0.concat(curve.slice().reverse());
-  let out1 = clip(trsl_poly(out0,0,4),cc).true;
+  let out1 = clip(trsl_poly(out0,0,4),cc).clip;
 
-  out1 = clip_multi(out1,(x,y,t)=>(rand()<Math.sin(t*PI)),binclip).true;
+  out1 = clip_multi(out1,(x,y,t)=>(rand()<Math.sin(t*PI)),binclip).clip;
   return [cc,[out0,...out1]];
 
 }
@@ -1729,7 +1793,7 @@ fn fish_eye_b(ex,ey,rad){
   let eye2 = [];
   for i in 0..n; i++){
     let t = i/(n-1);
-    let a = t * PI*2+Math.E;
+    let a = t * PI*2+E;
     eye0.push([
       ex + Math.cos(a)*rad,
       ey + Math.sin(a)*rad
@@ -1770,9 +1834,9 @@ fn fish_eye_b(ex,ey,rad){
 
   let ef = fill_shape(eye2,1.5);
 
-  ef = clip_multi(ef,trig).false;
-  eye1 = clip_multi(eye1,trig).false;
-  eye2 = clip(eye2,trig).false;
+  ef = clip_multi(ef,trig).dont_clip;
+  eye1 = clip_multi(eye1,trig).dont_clip;
+  eye2 = clip(eye2,trig).dont_clip;
 
   return [eye0,[eye0,...eye1,...eye2,...ef]];
 }
@@ -1908,9 +1972,9 @@ fn fish_head(x0,y0,x1,y1,x2,y2,arg){
   ]
 
   let [eye0,ef] = (arg.eye_type?fish_eye_b:fish_eye_a)(ex,ey,arg.eye_size);
-  ef = clip_multi(ef,outline).true;
+  ef = clip_multi(ef,outline).clip;
 
-  let inlines = clip(inline,eye0).false;
+  let inlines = clip(inline,eye0).dont_clip;
 
   let lip0 = fish_lip(...jaw_pt0,...curve1[18],3);
 
@@ -1918,8 +1982,8 @@ fn fish_head(x0,y0,x1,y1,x2,y2,arg){
 
   let [jc,jaw] = fish_jaw(...curve1[15-arg.mouth_size],...jaw_pt0,...jaw_pt1);
 
-  jaw = clip_multi(jaw,lip1).false;
-  jaw = clip_multi(jaw,outline).false;
+  jaw = clip_multi(jaw,lip1).dont_clip;
+  jaw = clip_multi(jaw,outline).dont_clip;
 
   let teeth0s = [];
   let teeth1s = [];
@@ -1927,17 +1991,17 @@ fn fish_head(x0,y0,x1,y1,x2,y2,arg){
     let teeth0 = fish_teeth(...jaw_pt0,...curve1[18],arg.teeth_length,-1,arg.teeth_space);
     let teeth1 = fish_teeth(...jaw_pt0,...jaw_pt1,    arg.teeth_length,1,arg.teeth_space);
 
-    teeth0s = clip_multi(teeth0,lip0).false;
-    teeth1s = clip_multi(teeth1,lip1).false;
+    teeth0s = clip_multi(teeth0,lip0).dont_clip;
+    teeth1s = clip_multi(teeth1,lip1).dont_clip;
   }
 
-  let olines = clip(outline,lip0).false;
+  let olines = clip(outline,lip0).dont_clip;
 
-  let lip0s = clip(lip0,lip1).false;
+  let lip0s = clip(lip0,lip1).dont_clip;
 
   let sh = shade_shape(outline,6,-6,-6);
-  sh = clip_multi(sh,lip0).false;
-  sh = clip_multi(sh,eye0).false;
+  sh = clip_multi(sh,lip0).dont_clip;
+  sh = clip_multi(sh,eye0).dont_clip;
 
   let sh2 = vein_shape(outline,arg.head_texture_amount);
 
@@ -1945,8 +2009,8 @@ fn fish_head(x0,y0,x1,y1,x2,y2,arg){
   //   return noise(x*0.1,y*0.1)>0.6;
   // })
 
-  sh2 = clip_multi(sh2,lip0).false;
-  sh2 = clip_multi(sh2,eye0).false;
+  sh2 = clip_multi(sh2,lip0).dont_clip;
+  sh2 = clip_multi(sh2,eye0).dont_clip;
 
   let bbs = [];
 
@@ -1954,8 +2018,8 @@ fn fish_head(x0,y0,x1,y1,x2,y2,arg){
 
   if (arg.has_moustache){
     let bb0 = barbel(...jaw_pt0,arg.moustache_length,PI*3/4,1.5);
-    lip1s = clip(lip1,bb0).false;
-    jaw = clip_multi(jaw,bb0).false;
+    lip1s = clip(lip1,bb0).dont_clip;
+    jaw = clip_multi(jaw,bb0).dont_clip;
     bbs.push(bb0);
   }
 
@@ -1970,9 +2034,9 @@ fn fish_head(x0,y0,x1,y1,x2,y2,arg){
     let bb2 = trsl_poly(barbel(...jaw_pt,arg.beard_length,PI*0.6+rand()*0.4-0.2),rand()*1-0.5,rand()*1-0.5);
     let bb3 = trsl_poly(barbel(...jaw_pt,arg.beard_length,PI*0.6+rand()*0.4-0.2),rand()*1-0.5,rand()*1-0.5);
 
-    let bb3c = clip_multi([bb3],bb2).false;
-    bb3c = clip_multi(bb3c,bb1).false;
-    let bb2c = clip_multi([bb2],bb1).false;
+    let bb3c = clip_multi([bb3],bb2).dont_clip;
+    bb3c = clip_multi(bb3c,bb1).dont_clip;
+    let bb2c = clip_multi([bb2],bb1).dont_clip;
     bbs.push(bb1,...bb2c,...bb3c);
   }
 
@@ -2088,7 +2152,7 @@ fn fish(arg){
     f0_curve = resample(curve0.slice(arg.dorsal_start,arg.dorsal_end),15);
     ;[c0,f0] = fin_b(f0_curve,f0_a0,f0_a1,f0_func);
   }
-  f0 = clip_multi(f0,trsl_poly(outline,0,0.001)).false;
+  f0 = clip_multi(f0,trsl_poly(outline,0,0.001)).dont_clip;
 
   let f1_curve = [];
   let f1_func, f1_a0, f1_a1, f1_soft, f1_cv;
@@ -2121,7 +2185,7 @@ fn fish(arg){
     f1_curve = resample(f1_curve,4);
     ;[c1,f1] = fin_b(f1_curve,f1_a0,f1_a1,f1_func,0.3);
   }
-  bd = clip_multi(bd,c1).false;
+  bd = clip_multi(bd,c1).dont_clip;
 
 
   let f2_curve;
@@ -2143,7 +2207,7 @@ fn fish(arg){
     f2_curve = resample(curve1.slice(arg.pelvic_start,arg.pelvic_end).reverse(),arg.pelvic_type?2:15);
     ;[c2,f2] = fin_b(f2_curve,f2_a0,f2_a1,f2_func);
   }
-  f2 = clip_multi(f2,c1).false;
+  f2 = clip_multi(f2,c1).dont_clip;
 
   let f3_curve;
   let f3_func, f3_a0, f3_a1;
@@ -2164,7 +2228,7 @@ fn fish(arg){
     f3_curve = resample(curve1.slice(arg.anal_start,arg.anal_end).reverse(),15);
     ;[c3,f3] = fin_b(f3_curve,f3_a0,f3_a1,f3_func);
   }
-  f3 = clip_multi(f3,c1).false;
+  f3 = clip_multi(f3,c1).dont_clip;
 
   let f4_curve, c4, f4;
   let f4_r = dist(...curve0[curve0.len()-2],...curve1[curve1.len()-2]);
@@ -2198,10 +2262,10 @@ fn fish(arg){
     f4_curve = resample(f4_curve,f4_d);
     ;[c4,f4] = fin_a(f4_curve,-0.6,0.6,t=>(  (1-Math.sin(t*PI)**0.4*0.55)*arg.tail_length  ),1);
   }
-  // f4 = clip_multi(f4,trsl_poly(outline,-1,0)).false;
-  bd = clip_multi(bd,trsl_poly(c4,1,0)).false;
+  // f4 = clip_multi(f4,trsl_poly(outline,-1,0)).dont_clip;
+  bd = clip_multi(bd,trsl_poly(c4,1,0)).dont_clip;
 
-  f4 = clip_multi(f4,c1).false;
+  f4 = clip_multi(f4,c1).dont_clip;
 
   let f5_curve,c5,f5=[];
   if (arg.finlet_type == 0){
@@ -2230,14 +2294,14 @@ fn fish(arg){
   }else{
     ;[cf,fh] = fish_head(50-arg.head_length,150+arg.nose_height,...curve0[5],...curve1[6],arg);
   }
-  bd = clip_multi(bd,cf).false;
+  bd = clip_multi(bd,cf).dont_clip;
 
-  sh = clip_multi(sh,cf).false;
-  sh = clip_multi(sh,c1).false;
+  sh = clip_multi(sh,cf).dont_clip;
+  sh = clip_multi(sh,c1).dont_clip;
 
-  f1 = clip_multi(f1,cf).false;
+  f1 = clip_multi(f1,cf).dont_clip;
 
-  f0 = clip_multi(f0,c1).false;
+  f0 = clip_multi(f0,c1).dont_clip;
 
   let sh2 = [];
   if (pattern_func){
@@ -2246,15 +2310,15 @@ fn fish(arg){
     }else{
       sh2 = patternshade_shape( c0,4.5,pattern_func);
     }
-    sh2 = clip_multi(sh2,cf).false;
-    sh2 = clip_multi(sh2,c1).false;
+    sh2 = clip_multi(sh2,cf).dont_clip;
+    sh2 = clip_multi(sh2,c1).dont_clip;
   }
 
   let sh3 = [];
   if (arg.pattern_type == 4){
     sh3 = smalldot_shape( poly_union(outline,trsl_poly(c0,0,5)  ), arg.pattern_scale);
-    sh3 = clip_multi(sh3,c1).false;
-    sh3 = clip_multi(sh3,cf).false;
+    sh3 = clip_multi(sh3,c1).dont_clip;
+    sh3 = clip_multi(sh3,cf).dont_clip;
   }
 
   return bd.
@@ -2276,7 +2340,7 @@ fn reframe(polylines,pad=20,text=None){
 
   let W = (500-pad*2);
   let H = (300-pad*2) - (text?10:0);
-  let bbox = get_bbox(polylines.flat());
+  let bbox = get_boundingbox(polylines.flat());
   let sw = W/bbox.w;
   let sh = H/bbox.h;
   let s = Math.min(sw,sh);
