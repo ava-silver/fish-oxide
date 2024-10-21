@@ -45,6 +45,7 @@ fn get_bbox(points: &Vec<(f64, f64)>) -> BBox {
     }
 }
 
+#[derive(Debug, Clone)]
 struct Intersection {
     t: f64,
     s: f64,
@@ -127,6 +128,7 @@ fn poly_bridge(poly0: &Vec<(f64, f64)>, poly1: &Vec<(f64, f64)>) -> Vec<(f64, f6
         .map(|p| *p)
         .collect()
 }
+#[derive(Debug, Clone)]
 struct Vertex {xy: (f64, f64), isects: Vec<Intersection>, isects_map: HashMap<(usize,usize), Intersection>}
 
 fn build_vertices(poly: &Vec<(f64, f64)>,other: &Vec<(f64, f64)>,out: &mut Vec<Vertex>,oout: &mut Vec<Vertex>,idx: usize, self_isect: bool, has_isect: &mut bool){
@@ -135,7 +137,6 @@ fn build_vertices(poly: &Vec<(f64, f64)>,other: &Vec<(f64, f64)>,out: &mut Vec<V
   if self_isect {
     for i in 0..n{
       let id = (idx,i);
-      let p = out[i];
       let i1 = (i + 1 + n) % n;
       let a = poly[i];
       let b = poly[i1];
@@ -147,7 +148,7 @@ fn build_vertices(poly: &Vec<(f64, f64)>,other: &Vec<(f64, f64)>,out: &mut Vec<V
         }
         let c = poly[j];
         let d = poly[j1];
-        let mut xx_opt = if let Some(ox) = out[j].isects_map.get(&id) {
+        let xx_opt = if let Some(ox) = out[j].isects_map.get(&id) {
           Some(Intersection{
             t: ox.s,
             s: ox.t,
@@ -162,8 +163,9 @@ fn build_vertices(poly: &Vec<(f64, f64)>,other: &Vec<(f64, f64)>,out: &mut Vec<V
         if let Some( mut xx) = xx_opt {
           xx.other = Some(j);
           xx.jump = Some(false);
-          p.isects.push(xx);
-          p.isects_map[&jd] = xx;
+          let p = out.get_mut(i).unwrap();
+          p.isects.push(xx.clone());
+          p.isects_map.insert(jd, xx);
         }
       }
 
@@ -172,7 +174,7 @@ fn build_vertices(poly: &Vec<(f64, f64)>,other: &Vec<(f64, f64)>,out: &mut Vec<V
 
   for i in 0..n {
     let id = (idx,i);
-    let p = out[i];
+    let p = out.get_mut(i).unwrap();
     let i1 = (i + 1 + n) % n;
     let a = poly[i];
     let b = poly[i1];
@@ -181,7 +183,7 @@ fn build_vertices(poly: &Vec<(f64, f64)>,other: &Vec<(f64, f64)>,out: &mut Vec<V
       let j1 = (j + 1 + m) % m;
       let c = other[j];
       let d = other[j1];
-      let mut xx_opt = if let Some(ox) = oout[j].isects_map.get(&id) {
+      let xx_opt = if let Some(ox) = oout[j].isects_map.get(&id) {
         Some(Intersection{
                   t: ox.s,
             s: ox.t,
@@ -196,9 +198,9 @@ fn build_vertices(poly: &Vec<(f64, f64)>,other: &Vec<(f64, f64)>,out: &mut Vec<V
       if let Some( mut xx) = xx_opt {
         *has_isect = true;
           xx.other = Some(j);
-          xx.jump = Some(false);
-          p.isects.push(xx);
-          p.isects_map[&jd] = xx;
+          xx.jump = Some(true);
+          p.isects.push(xx.clone());
+          p.isects_map.insert(jd, xx);
       }
     }
     p.isects.sort_by(|a,b| a.t.total_cmp(&b.t));
@@ -226,54 +228,56 @@ fn poly_union(poly0: &Vec<(f64, f64)>,poly1: &Vec<(f64, f64)>,self_isect_opt: Op
   }
 
 
-  let isect_mir = {};
-  fn mirror_isects(verts0,verts1,idx) {
+  let mut isect_mir = HashMap::new();
+  fn mirror_isects(verts0:  &mut Vec<Vertex>,verts1:  &mut Vec<Vertex>,idx: usize, isect_mir: &mut HashMap<(usize, usize, i32),(usize, usize, usize)>) {
     let n = verts0.len();
     for i in 0..n {
-      for j in 0..verts0[i].isects.len() {
-        let id = (idx, i, j);
-        let {jump} = verts0[i].isects[j];
-        let jd = jump?(1-idx):idx;
-        let k = verts0[i].isects[j].other;
-        let z = (jump?verts1:verts0)[k].isects.findIndex((x) => (x.jump == jump && x.other == i));
-        isect_mir[id] = [jd, k, z];
+      let m = verts0[i].isects.len();
+      for j in 0..m {
+        let id = (idx, i, j as i32);
+        let jump = verts0[i].isects[j].jump.unwrap_or(false);
+        let jd = if jump {1-idx} else {idx};
+        let k = verts0[i].isects[j].other.unwrap();
+        let z = (if jump {&verts1} else{ &verts0})[k].isects.iter().position(|x| (x.jump == Some(jump) && x.other == Some(i))).unwrap();
+        isect_mir.insert(id, (jd, k, z));
       }
     }
   }
-  mirror_isects(verts0,verts1,0);
-  mirror_isects(verts1,verts0,1);
+  mirror_isects(&mut verts0,&mut verts1,0, &mut isect_mir);
+  mirror_isects(&mut verts1,&mut verts0,1, &mut isect_mir);
 
 
-  fn trace_outline(idx, i0, j0, dir) {
+  fn trace_outline(idx: usize, i0: usize, j0: usize, dir: i8, verts0: &Vec<Vertex>, verts1: &Vec<Vertex>, isect_mir: &HashMap<(usize, usize, i32),(usize, usize, usize)>) {
     let zero = None;
-    let out = [];
-    fn trace_from(idx, i0, j0, dir) {
-      if (zero == None) {
-        zero = [idx, i0, j0];
-      } else if (idx == zero[0] && i0 == zero[1] && j0 == zero[2]) {
+    let mut out = Vec::new();
+    fn trace_from(zero: Option<(usize, usize, i32)>, verts0: &Vec<Vertex>, verts1: &Vec<Vertex>, idx: usize, i0: usize, j0: i32, dir: i32, out: &mut Vec<(f64, f64)>, isect_mir: &HashMap<(usize, usize, i32),(usize, usize, usize)>)-> bool {
+      if zero == None {
+        zero = Some((idx, i0, j0));
+      } else if idx == zero.unwrap().0 && i0 == zero.unwrap().1 && j0 == zero.unwrap().2 {
         return true;
       }
-      let verts = idx?verts1:verts0;
+      let verts = if idx > 0 {verts1} else {verts0};
       let n = verts.len();
       let p = verts[i0];
-      let i1 = (i0 + dir + n) % n;
-      if (j0 == -1) {
+      let i1 = (((i0 + n) as i32) +dir) % n.into();
+      if j0 == -1 {
         out.push(p.xy);
-        if (dir < 0) {
-          return trace_from(idx,i1, verts[i1].isects.len() - 1, dir);
-        } else if (!verts[i0].isects.len()) {
-          return trace_from(idx, i1, -1, dir, [i0, j0]);
+        if dir < 0 {
+          return trace_from(zero, verts0, verts1, idx,i1, verts[i1].isects.len().into() - 1, dir, out, isect_mir);
+        } else if verts[i0].isects.is_empty() {
+          return trace_from(zero, verts0, verts1, idx,i1,  - 1, dir, out, isect_mir);
         } else {
-          return trace_from(idx, i0, 0, dir, [i0, j0]);
-        }
-      } else if (j0 >= p.isects.len()) {
-        return trace_from(idx, i1, -1, dir, [i0, j0]);
-      } else {
-        let id = (idx, i0, j0);
-        out.push(p.isects[j0].xy);
+          return trace_from(zero, verts0, verts1, idx,i0,  0, dir, out, isect_mir);
 
-        let q = p.isects[j0];
-        let [jdx, k, z] = isect_mir[id];
+        }
+      } else if j0 >= p.isects.len() as i32 {
+          return trace_from(zero, verts0, verts1, idx,i1,  -1, dir, out, isect_mir);
+
+      } else {
+        out.push(p.isects[j0 as usize].xy.unwrap());
+
+        let q = p.isects[j0 as usize];
+        let (jdx, k, z) = isect_mir[&(idx, i0, j0)];
         let params;
         if (q.side * dir < 0) {
           params = [jdx, k, z - 1, -1];
