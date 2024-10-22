@@ -18,11 +18,11 @@ pub fn lerp2d((x0, y0): Point, (x1, y1): Point, t: f64) -> Point {
     (x0 * (1. - t) + x1 * t, y0 * (1. - t) + y1 * t)
 }
 
-struct BoundingBox {
-    x: f64,
-    y: f64,
-    w: f64,
-    h: f64,
+pub struct BoundingBox {
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
 }
 
 pub fn get_boundingbox(points: &Polyline) -> BoundingBox {

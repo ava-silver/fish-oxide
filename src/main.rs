@@ -2,7 +2,7 @@
 use clap::{command, Parser, ValueEnum};
 use core::f64;
 use core::f64::consts::{E, PI};
-use geometry::{dist, trsl_poly, Polyline};
+use geometry::{dist, get_boundingbox, trsl_poly, Polyline};
 use hershey::compile_hershey;
 use params::generate_params;
 use rand::{thread_rng, Rng};
@@ -1711,32 +1711,41 @@ fn fish(arg){
   // concat([cf]).
   concat();
 }
-
-fn reframe(polylines,pad=20,text=None){
-
-  let W = (500-pad*2);
-  let H = (300-pad*2) - (text?10:0);
-  let bbox = get_boundingbox(polylines.flat());
-  let sw = W/bbox.w;
-  let sh = H/bbox.h;
-  let s = Math.min(sw,sh);
-  let px = (W-bbox.w*s)/2;
-  let py = (H-bbox.h*s)/2;
-  for i in 0..polylines.len() {
-    for j in 0..polylines[i].len(); j++){
-      let [x,y] = polylines[i][j];
-      x = (x - bbox.x) * s + px+pad;
-      y = (y - bbox.y) * s + py+pad;
-      polylines[i][j] = [x,y];
-    }
-  }
-  let [tw,tp] = put_text(text);
-  tp = tp.map(p=>scl_poly(shr_poly(p,-0.3),0.3,0.3));
-  tw *= 0.3;
-  polylines.push(...tp.map(p=>trsl_poly(p,250-tw/2,300-pad+5)));
-  return polylines;
-}
 */
+
+fn reframe(
+    mut polylines: Vec<Polyline>,
+    pad_opt: Option<f64>,
+    text: Option<String>,
+) -> Vec<Polyline> {
+    let pad = pad_opt.unwrap_or(20.);
+
+    let w = (500. - pad * 2.);
+    let h = ((300. - pad * 2.) - (if text.is_some() { 10. } else { 0. }));
+    let bbox = get_boundingbox(&polylines.clone().into_iter().flatten().collect());
+    let sw = w / bbox.w;
+    let sh = h as f64 / bbox.h;
+    let s = sw.min(sh);
+    let px = (w - bbox.w * s) / 2.;
+    let py = (h - bbox.h * s) / 2.;
+    for i in 0..polylines.len() {
+        for j in 0..polylines[i].len() {
+            let (mut x, mut y) = polylines[i][j];
+            x = (x - bbox.x) * s + px + pad;
+            y = (y - bbox.y) * s + py + pad;
+            polylines[i][j] = (x, y);
+        }
+    }
+    let (mut tw, mut tp) = put_text(text.unwrap_or(String::new()));
+    todo!();
+    // tp = tp.into_iter().map(|p| scl_poly(shr_poly(p,-0.3),0.3,0.3));
+    tw *= 0.3;
+    polylines.extend(
+        tp.into_iter()
+            .map(|p| trsl_poly(&p, 250. - tw / 2., 300. - pad + 5.)),
+    );
+    return polylines;
+}
 
 fn cleanup(polylines: Vec<Polyline>) -> Vec<Vec<(f64, f64)>> {
     for i in (polylines.len() - 1)..=0 {
