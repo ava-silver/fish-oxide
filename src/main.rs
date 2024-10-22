@@ -1824,10 +1824,13 @@ enum Format {
 #[command(version, about, long_about = None)]
 pub struct Cli {
     /// Output format, defaults to svg
+    #[arg(short, long)]
     format: Option<Format>,
     /// Random seed
+    #[arg(long)]
     seed: Option<String>,
     /// Animation speed
+    #[arg(long)]
     speed: Option<f64>,
 }
 
