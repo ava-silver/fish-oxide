@@ -1,10 +1,20 @@
-fn dist((x0, y0): (f64, f64), (x1, y1): (f64, f64)) -> f64 {
+use crate::custom_rand::rand;
+use std::{
+    collections::HashMap,
+    f64::consts::{E, PI},
+    iter::successors,
+};
+
+pub type Point = (f64, f64);
+pub type Polyline = Vec<Point>;
+
+pub fn dist((x0, y0): Point, (x1, y1): Point) -> f64 {
     ((x1 - x0).powi(2) + (y1 - y0).powi(2)).sqrt()
 }
-fn lerp(a: f64, b: f64, t: f64) -> f64 {
+pub fn lerp(a: f64, b: f64, t: f64) -> f64 {
     a * (1. - t) + b * t
 }
-fn lerp2d((x0, y0): (f64, f64), (x1, y1): (f64, f64), t: f64) -> (f64, f64) {
+pub fn lerp2d((x0, y0): Point, (x1, y1): Point, t: f64) -> Point {
     (x0 * (1. - t) + x1 * t, y0 * (1. - t) + y1 * t)
 }
 
@@ -15,7 +25,7 @@ struct BoundingBox {
     h: f64,
 }
 
-fn get_boundingbox(points: &Vec<(f64, f64)>) -> BoundingBox {
+pub fn get_boundingbox(points: &Polyline) -> BoundingBox {
     let mut xmin = f64::INFINITY;
     let mut ymin = f64::INFINITY;
     let mut xmax = -f64::INFINITY;
@@ -37,26 +47,26 @@ fn get_boundingbox(points: &Vec<(f64, f64)>) -> BoundingBox {
 }
 
 #[derive(Debug, Clone)]
-struct Intersection {
+pub struct Intersection {
     t: f64,
     s: f64,
     side: i32,
     other: Option<usize>,
-    xy: Option<(f64, f64)>,
+    xy: Option<Point>,
     jump: Option<bool>,
 }
 
-fn sort_intersections(intersections: &mut Vec<Intersection>) {
+pub fn sort_intersections(intersections: &mut Vec<Intersection>) {
     intersections.sort_by(|a, b| a.t.total_cmp(&b.t));
 }
 
-fn pt_in_pl((x, y): (f64, f64), (x0, y0): (f64, f64), (x1, y1): (f64, f64)) -> f64 {
+pub fn pt_in_pl((x, y): Point, (x0, y0): Point, (x1, y1): Point) -> f64 {
     let dx = x1 - x0;
     let dy = y1 - y0;
     (x - x0) * dy - (y - y0) * dx
 }
 
-fn get_side((x, y): (f64, f64), (x0, y0): (f64, f64), (x1, y1): (f64, f64)) -> i32 {
+pub fn get_side((x, y): Point, (x0, y0): Point, (x1, y1): Point) -> i32 {
     if pt_in_pl((x, y), (x0, y0), (x1, y1)) < 0. {
         1
     } else {
@@ -64,11 +74,11 @@ fn get_side((x, y): (f64, f64), (x0, y0): (f64, f64), (x1, y1): (f64, f64)) -> i
     }
 }
 
-fn seg_isect(
-    (p0x, p0y): (f64, f64),
-    (p1x, p1y): (f64, f64),
-    (q0x, q0y): (f64, f64),
-    (q1x, q1y): (f64, f64),
+pub fn seg_isect(
+    (p0x, p0y): Point,
+    (p1x, p1y): Point,
+    (q0x, q0y): Point,
+    (q1x, q1y): Point,
     is_ray_opt: Option<bool>,
 ) -> Option<Intersection> {
     let is_ray = is_ray_opt.unwrap_or(false);
@@ -99,7 +109,7 @@ fn seg_isect(
     return None;
 }
 
-fn poly_bridge(poly0: &Vec<(f64, f64)>, poly1: &Vec<(f64, f64)>) -> Vec<(f64, f64)> {
+pub fn poly_bridge(poly0: &Polyline, poly1: &Polyline) -> Polyline {
     let mut dmin = f64::INFINITY;
     let mut imin = (0, 0);
     for i in 0..poly0.len() {
@@ -124,15 +134,15 @@ fn poly_bridge(poly0: &Vec<(f64, f64)>, poly1: &Vec<(f64, f64)>) -> Vec<(f64, f6
         .collect()
 }
 #[derive(Debug, Clone)]
-struct Vertex {
-    xy: (f64, f64),
+pub struct Vertex {
+    xy: Point,
     isects: Vec<Intersection>,
     isects_map: HashMap<(usize, usize), Intersection>,
 }
 
-fn build_vertices(
-    poly: &Vec<(f64, f64)>,
-    other: &Vec<(f64, f64)>,
+pub fn build_vertices(
+    poly: &Polyline,
+    other: &Polyline,
     out: &mut Vec<Vertex>,
     oout: &mut Vec<Vertex>,
     idx: usize,
@@ -213,11 +223,7 @@ fn build_vertices(
     }
 }
 
-fn poly_union(
-    poly0: &Vec<(f64, f64)>,
-    poly1: &Vec<(f64, f64)>,
-    self_isect_opt: Option<bool>,
-) -> Vec<(f64, f64)> {
+pub fn poly_union(poly0: &Polyline, poly1: &Polyline, self_isect_opt: Option<bool>) -> Polyline {
     let self_isect = self_isect_opt.unwrap_or(false);
     let mut verts0 = poly0
         .iter()
@@ -266,7 +272,7 @@ fn poly_union(
     }
 
     let mut isect_mir = HashMap::new();
-    fn mirror_isects(
+    pub fn mirror_isects(
         verts0: &mut Vec<Vertex>,
         verts1: &mut Vec<Vertex>,
         idx: usize,
@@ -292,7 +298,7 @@ fn poly_union(
     mirror_isects(&mut verts0, &mut verts1, 0, &mut isect_mir);
     mirror_isects(&mut verts1, &mut verts0, 1, &mut isect_mir);
 
-    fn trace_outline(
+    pub fn trace_outline(
         idx: usize,
         i0: usize,
         j0: i32,
@@ -300,8 +306,8 @@ fn poly_union(
         verts0: &Vec<Vertex>,
         verts1: &Vec<Vertex>,
         isect_mir: &HashMap<(usize, usize, i32), (usize, usize, i32)>,
-    ) -> Option<Vec<(f64, f64)>> {
-        fn trace_from(
+    ) -> Option<Polyline> {
+        pub fn trace_from(
             mut zero: Option<(usize, usize, i32)>,
             verts0: &Vec<Vertex>,
             verts1: &Vec<Vertex>,
@@ -309,7 +315,7 @@ fn poly_union(
             i0: usize,
             j0: i32,
             dir: i32,
-            out: &mut Vec<(f64, f64)>,
+            out: &mut Polyline,
             isect_mir: &HashMap<(usize, usize, i32), (usize, usize, i32)>,
         ) -> bool {
             if zero == None {
@@ -397,7 +403,7 @@ fn poly_union(
         }
     }
 
-    fn check_concavity(poly: &Vec<(f64, f64)>, idx: usize) -> i32 {
+    pub fn check_concavity(poly: &Polyline, idx: usize) -> i32 {
         let n = poly.len();
         let a = poly[(idx - 1 + n) % n];
         let b = poly[idx];
@@ -411,10 +417,10 @@ fn poly_union(
     outline.unwrap_or_else(|| Vec::new())
 }
 
-fn seg_isect_poly(
-    p0: (f64, f64),
-    p1: (f64, f64),
-    poly: &Vec<(f64, f64)>,
+pub fn seg_isect_poly(
+    p0: Point,
+    p1: Point,
+    poly: &Polyline,
     is_ray_opt: Option<bool>,
 ) -> Vec<Intersection> {
     let is_ray = is_ray_opt.unwrap_or(false);
@@ -433,23 +439,23 @@ fn seg_isect_poly(
 }
 
 #[derive(Default)]
-struct ClipSegments {
-    clip: Vec<Vec<(f64, f64)>>,
-    dont_clip: Vec<Vec<(f64, f64)>>,
+pub struct ClipSegments {
+    clip: Vec<Polyline>,
+    dont_clip: Vec<Polyline>,
 }
 
 impl ClipSegments {
-    fn new_with_empty() -> Self {
+    pub fn new_with_empty() -> Self {
         ClipSegments {
             clip: vec![vec![]],
             dont_clip: vec![vec![]],
         }
     }
-    fn extend(&mut self, other: Self) {
+    pub fn extend(&mut self, other: Self) {
         self.clip.extend(other.clip.into_iter());
         self.dont_clip.extend(other.dont_clip.into_iter());
     }
-    fn filter_empty(mut self) -> Self {
+    pub fn filter_empty(mut self) -> Self {
         self.clip = self.clip.into_iter().filter(|l| !l.is_empty()).collect();
         self.dont_clip = self
             .dont_clip
@@ -458,7 +464,7 @@ impl ClipSegments {
             .collect();
         self
     }
-    fn get(&self, clip: bool) -> &Vec<Vec<(f64, f64)>> {
+    pub fn get(&self, clip: bool) -> &Vec<Polyline> {
         if clip {
             &self.clip
         } else {
@@ -466,7 +472,7 @@ impl ClipSegments {
         }
     }
 
-    fn get_mut(&mut self, clip: bool) -> &mut Vec<Vec<(f64, f64)>> {
+    pub fn get_mut(&mut self, clip: bool) -> &mut Vec<Polyline> {
         if clip {
             &mut self.clip
         } else {
@@ -475,7 +481,7 @@ impl ClipSegments {
     }
 }
 
-fn clip(polyline: &Vec<(f64, f64)>, polygon: &Vec<(f64, f64)>) -> ClipSegments {
+pub fn clip(polyline: &Polyline, polygon: &Polyline) -> ClipSegments {
     if (polyline.is_empty()) {
         return ClipSegments::default();
     }
@@ -510,10 +516,10 @@ fn clip(polyline: &Vec<(f64, f64)>, polygon: &Vec<(f64, f64)>) -> ClipSegments {
     out.filter_empty()
 }
 
-fn clip_multi(
-    polylines: &Vec<Vec<(f64, f64)>>,
-    polygon: &Vec<(f64, f64)>,
-    clipper_func_opt: Option<fn(&Vec<(f64, f64)>, &Vec<(f64, f64)>) -> ClipSegments>,
+pub fn clip_multi(
+    polylines: &Vec<Polyline>,
+    polygon: &Polyline,
+    clipper_func_opt: Option<fn(&Polyline, &Polyline) -> ClipSegments>,
 ) -> ClipSegments {
     let clipper_func = clipper_func_opt.unwrap_or(clip);
     let mut out = ClipSegments::default();
@@ -523,7 +529,7 @@ fn clip_multi(
     return out;
 }
 
-fn binclip(polyline: &Vec<(f64, f64)>, func: fn((f64, f64), usize) -> bool) -> ClipSegments {
+pub fn binclip(polyline: &Polyline, func: fn(Point, usize) -> bool) -> ClipSegments {
     if (polyline.is_empty()) {
         return ClipSegments::default();
     }
@@ -557,16 +563,16 @@ fn binclip(polyline: &Vec<(f64, f64)>, func: fn((f64, f64), usize) -> bool) -> C
     out.filter_empty()
 }
 
-fn trsl_poly(poly: &Vec<(f64, f64)>, x: f64, y: f64) -> Vec<(f64, f64)> {
+pub fn trsl_poly(poly: &Polyline, x: f64, y: f64) -> Polyline {
     return poly.iter().map(|(x0, y0)| (x0 + x, y0 + y)).collect();
 }
 
-fn shade_shape(
-    poly: &Vec<(f64, f64)>,
+pub fn shade_shape(
+    poly: &Polyline,
     step_opt: Option<f64>,
     dx_opt: Option<f64>,
     dy_opt: Option<f64>,
-) -> Vec<Vec<(f64, f64)>> {
+) -> Vec<Polyline> {
     let step = step_opt.unwrap_or(5.);
     let dx = dx_opt.unwrap_or(10.);
     let dy = dy_opt.unwrap_or(20.);

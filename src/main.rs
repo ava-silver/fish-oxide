@@ -2,6 +2,7 @@
 use clap::{command, Parser, ValueEnum};
 use core::f64;
 use core::f64::consts::{E, PI};
+use geometry::{dist, trsl_poly, Polyline};
 use hershey::compile_hershey;
 use params::generate_params;
 use rand::{thread_rng, Rng};
@@ -12,12 +13,11 @@ use std::sync::LazyLock;
 use std::{collections::HashMap, default};
 
 pub mod custom_rand;
+pub mod geometry;
 pub mod hershey;
 pub mod params;
-pub mod geometry;
 
 use custom_rand::{choice, rand, rndtri, rndtri_f, seed_rand};
-
 
 /*
 
@@ -1738,29 +1738,28 @@ fn reframe(polylines,pad=20,text=None){
 }
 */
 
-fn cleanup(polylines){
-  for i in polylines.len()-1; i>=0; i--){
-    polylines[i] = approx_poly_dp(polylines[i],0.1);
-    for j in 0..polylines[i].len(); j++){
-      for k in 0; k < polylines[i][j].len(); k++){
-        polylines[i][j][k] = !!(polylines[i][j][k]*10000)/10000;
-      }
+fn cleanup(polylines: Vec<Polyline>) -> Vec<Vec<(f64, f64)>> {
+    for i in (polylines.len() - 1)..=0 {
+        polylines[i] = todo!(); //approx_poly_dp(polylines[i], 0.1);
+        for j in 0..polylines[i].len() {
+            polylines[i][j] = (
+                (polylines[i][j].0 * 10000.).trunc() / 10000.,
+                (polylines[i][j].1 * 10000.).trunc() / 10000.,
+            );
+        }
+        if (polylines[i].len() < 2) {
+            polylines.splice(i..1, []);
+            continue;
+        }
+        if (polylines[i].len() == 2) {
+            if (dist(polylines[i][0], polylines[i][1]) < 0.9) {
+                polylines.splice(i..1, []);
+                continue;
+            }
+        }
     }
-    if (polylines[i].len() < 2){
-      polylines.splice(i,1);
-      continue;
-    }
-    if (polylines[i].len() == 2){
-      if (dist(...polylines[0],...polylines[1])<0.9){
-        polylines.splice(i,1);
-        continue;
-      }
-    }
-  }
-  return polylines;
+    return polylines;
 }
-
-
 
 fn put_text(txt: String) -> (f64, Vec<Vec<(f64, f64)>>) {
     let base = 500;
@@ -1834,7 +1833,7 @@ fn main() {
     let format = args.format.unwrap_or(Format::Svg);
     let mut speed = 0.005;
     speed = speed / args.speed.unwrap_or(1.);
-    let drawing = fish(generate_params());
+    let drawing = todo!("fish(generate_params())");
     let polylines: Vec<Vec<Vec<(f64, f64)>>> = Vec::new(); //(cleanup(reframe(drawing, 20, seed + '.')));
 
     println!(
