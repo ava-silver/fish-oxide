@@ -96,3 +96,47 @@ pub fn noise(mut x: f64, y_opt: Option<f64>, z_opt: Option<f64>) -> f64 {
     }
     return r;
 }
+
+pub fn choice<'a, T>(opts: &'a [T], percs_opt: Option<&[u32]>) -> &'a T {
+    let default_percs = opts.iter().map(|_| 1).collect::<Vec<_>>();
+    let percs = percs_opt.unwrap_or(&default_percs);
+    let mut s = percs.iter().sum();
+    let mut r = rand() * s as u64;
+    s = 0;
+    for i in 0..percs.len() {
+        s += percs[i];
+        if (r <= s as u64) {
+            return &opts[i];
+        }
+    }
+    unreachable!();
+}
+
+pub fn rndtri(a: i32, b: i32, c: i32) -> i32 {
+    let mut s0 = (b - a) / 2;
+    let mut s1 = (c - b) / 2;
+    let mut s = s0 + s1;
+    let mut r = rand() as i32 * s;
+    if (r < s0) {
+        //d * d/(b-a) / 2 = r;
+        let mut d = ((2 * r * (b - a)) as f32).sqrt();
+        return a + d as i32;
+    }
+    //d * d/(c-b) / 2 = s-r;
+    let mut d = ((2 * (s - r) * (c - b)) as f32).sqrt();
+    return c - d as i32;
+}
+pub fn rndtri_f(a: f64, b: f64, c: f64) -> f64 {
+    let mut s0 = (b - a) / 2.;
+    let mut s1 = (c - b) / 2.;
+    let mut s = s0 + s1;
+    let mut r = rand() as f64 * s;
+    if (r < s0) {
+        //d * d/(b-a) / 2 = r;
+        let mut d = (2. * r * (b - a)).sqrt();
+        return a + d;
+    }
+    //d * d/(c-b) / 2 = s-r;
+    let mut d = (2. * (s - r) * (c - b)).sqrt();
+    return c - d;
+}

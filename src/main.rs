@@ -2,14 +2,20 @@
 use clap::{command, Parser, ValueEnum};
 use core::f64;
 use core::f64::consts::{E, PI};
+use hershey::compile_hershey;
+use params::generate_params;
 use rand::{thread_rng, Rng};
+use regex::Regex;
 use std::cmp::Ordering;
 use std::iter::successors;
+use std::sync::LazyLock;
 use std::{collections::HashMap, default};
 
 pub mod custom_rand;
+pub mod hershey;
+pub mod params;
 
-use custom_rand::{rand, seed_rand};
+use custom_rand::{choice, rand, rndtri, rndtri_f, seed_rand};
 
 fn dist((x0, y0): (f64, f64), (x1, y1): (f64, f64)) -> f64 {
     ((x1 - x0).powi(2) + (y1 - y0).powi(2)).sqrt()
@@ -654,7 +660,7 @@ fn patternshade_shape(poly,step=5,pattern_func){
   }
   lines = clip_multi(lines,poly).clip;
 
-  for i in 0..lines.len(); i++){
+  for i in 0..lines.len() {
     lines[i] = resample(lines[i],2);
   }
 
@@ -667,7 +673,7 @@ fn patternshade_shape(poly,step=5,pattern_func){
 fn vein_shape(poly,n=50){
   let bbox = get_boundingbox(poly);
   let out = [];
-  for i in 0..n; i++){
+  for i in 0..n {
     let x = bbox.x + rand()*bbox.w;
     let y = bbox.y + rand()*bbox.h;
     let o = [[x,y]];
@@ -688,13 +694,13 @@ fn smalldot_shape(poly,scale=1){
   let samples = [];
   let bbox = get_boundingbox(poly);
   poissondisk(bbox.w,bbox.h,5*scale,samples);
-  for i in 0..samples.len(); i++){
+  for i in 0..samples.len() {
     samples[i][0] += bbox.x;
     samples[i][1] += bbox.y;
   }
   let out = [];
   let n = 7;
-  for i in 0..samples.len(); i++){
+  for i in 0..samples.len() {
     let [x,y] =samples[i]
     let t = (y > 0) ? (y/300) : 0.5;
     // console.log(y,t);
@@ -762,7 +768,7 @@ fn resample(polyline,step){
       i++;
       continue;
     }
-    let n = ~~(d/step);
+    let n = !!(d/step);
     let rest = (n*step)/d;
     let rpx = a[0] * (1-rest) + b[0] * rest;
     let rpy = a[1] * (1-rest) + b[1] * rest;
@@ -855,7 +861,7 @@ fn approx_poly_dp(polyline, epsilon){
   }
   let dmax   = 0;
   let argmax = -1;
-  for i in 1; i < polyline.len()-1; i++){
+  for i in 1; i < polyline.len()-1 {
     let d = pt_seg_dist(polyline[i] ,
                         polyline[0] ,
                         polyline[polyline.len()-1] );
@@ -886,21 +892,21 @@ fn poissondisk(W, H, r, samples) {
   let active = [];
   let w =  ((r) / (1.4142135624));
   let r2 = ((r) * (r));
-  let cols = (~~(((W) / (w))));
-  let rows = (~~(((H) / (w))));
+  let cols = (!!(((W) / (w))));
+  let rows = (!!(((H) / (w))));
   for i in (0); Number((i) < (((cols) * (rows)))); i += (1)) {
     (grid).splice((grid.len()), 0, (-1));
   };
   let pos = [(((W) / (2.0))), (((H) / (2.0)))];
   (samples).splice((samples.len()), 0, (pos));
   for i in (0); Number((i) < (samples.len())); i += (1)) {
-    let col = (~~(((((((samples)[i]))[0])) / (w))));
-    let row = (~~(((((((samples)[i]))[1])) / (w))));
+    let col = (!!(((((((samples)[i]))[0])) / (w))));
+    let row = (!!(((((((samples)[i]))[1])) / (w))));
     ((grid)[((col) + (((row) * (cols))))] = i);
     (active).splice((active.len()), 0, (((samples)[i])));
   };
   while (active.len()) {
-    let ridx = (~~(((rand()) * (active.len()))));
+    let ridx = (!!(((rand()) * (active.len()))));
     pos = ((active)[ridx]);
     let found = 0;
     for n in (0); Number((n) < (30)); n += (1)) {
@@ -908,8 +914,8 @@ fn poissondisk(W, H, r, samples) {
       let sa = ((6.2831853072) * (rand()));
       let sx = ((((pos)[0])) + (((sr) * (Math.cos(sa)))));
       let sy = ((((pos)[1])) + (((sr) * (Math.sin(sa)))));
-      let col = (~~(((sx) / (w))));
-      let row = (~~(((sy) / (w))));
+      let col = (!!(((sx) / (w))));
+      let row = (!!(((sy) / (w))));
       if (((((((((Number((col) > (0))) && (Number((row) > (0))))) && (Number((col) < (((cols) - (1))))))) && (Number((row) < (((rows) - (1))))))) && (Number((((grid)[((col) + (((row) * (cols))))])) == (-1))))) {
         let ok = 1;
         for i in (-1); Number((i) <= (1)); i += (1)) {
@@ -943,11 +949,11 @@ fn poissondisk(W, H, r, samples) {
 fn draw_svg(polylines){
   let o = `<svg xmlns="http://www.w3.org/2000/svg" width="520" height="320">`
   o += `<rect x="0" y="0" width="520" height="320" fill="floralwhite"/><rect x="10" y="10" width="500" height="300" stroke="black" stroke-width="1" fill="none"/><path stroke="black" stroke-width="1" fill="none" stroke-linecap="round" stroke-linejoin="round" d="`
-  for i in 0..polylines.len(); i++){
+  for i in 0..polylines.len() {
     o += '\nM ';
     for j in 0..polylines[i].len(); j++){
       let [x,y] = polylines[i][j];
-      o += `${(~~((x+10)*100)) /100} ${(~~((y+10)*100)) /100} `;
+      o += `${(!!((x+10)*100)) /100} ${(!!((y+10)*100)) /100} `;
     }
   }
   o += `\n"/></svg>`
@@ -997,10 +1003,10 @@ fn draw_ps(polylines){
 closepath
 F
 `;
-  for i in 0..polylines.len(); i++){
+  for i in 0..polylines.len() {
     for j in 0..polylines[i].len(); j++){
       let [x,y] = polylines[i][j];
-      o += `${(~~((x+10)*100)) /100} ${(~~((310-y)*100)) /100} `;
+      o += `${(!!((x+10)*100)) /100} ${(!!((310-y)*100)) /100} `;
       if (j == 0) {
         o += `m\n`;
       } else {
@@ -1028,7 +1034,7 @@ fn gauss2d(x, y){
 fn squama_mask(w,h){
   let p = [];
   let n = 7;
-  for i in 0..n; i++){
+  for i in 0..n {
     let t = i/n;
     let a = t * PI * 2;
     let x = -pow(Math.cos(a),1.3)*w;
@@ -1041,7 +1047,7 @@ fn squama_mask(w,h){
 fn squama(w,h,m=3) {
   let p = [];
   let n = 8;
-  for i in 0..n; i++){
+  for i in 0..n {
     let t = i/(n-1);
     let a = t * PI + PI/2;
     let x = -pow(Math.cos(a),1.4)*w;
@@ -1049,7 +1055,7 @@ fn squama(w,h,m=3) {
     p.push([x,y]);
   }
   let q = [p];
-  for i in 0..m; i++){
+  for i in 0..m {
     let t = i/(m-1);
     q.push([
       [-w*0.3 + (rand()-0.5),-h*0.2+t*h*0.4 + (rand()-0.5)],
@@ -1070,7 +1076,7 @@ fn rot_poly(poly,th){
   let qoly = [];
   let costh = Math.cos(th);
   let sinth = Math.sin(th);
-  for i in 0..poly.len(); i++){
+  for i in 0..poly.len() {
     let [x0,y0] = poly[i]
     let x = x0* costh-y0*sinth;
     let y = x0* sinth+y0*costh;
@@ -1083,7 +1089,7 @@ fn squama_mesh(m,n,uw,uh,squama_func,noise_x,noise_y,interclip=true){
   let clipper = None;
 
   let pts = [];
-  for i in 0..n; i++){
+  for i in 0..n {
     for j in 0..m; j++){
       let x = j*uw;
       let y = (n*uh/2) - Math.cos(i/(n-1) * PI) * (n*uh/2);
@@ -1097,7 +1103,7 @@ fn squama_mesh(m,n,uw,uh,squama_func,noise_x,noise_y,interclip=true){
   let out = [];
 
   let whs = [];
-  for i in 0..n; i++){
+  for i in 0..n {
     for j in 0..m; j++){
       if (i == 0 || j == 0 || i == n-1 || j == m-1){
         whs.push([uw/2,uh/2]);
@@ -1116,7 +1122,7 @@ fn squama_mesh(m,n,uw,uh,squama_func,noise_x,noise_y,interclip=true){
   }
 
   for j in 1; j < m-1; j++){
-    for i in 1; i < n-1; i++){
+    for i in 1; i < n-1 {
       let [x,y]  = pts[i*m+j];
       let [dw,dh]= whs[i*m+j];
       let q = trsl_poly(squama_mask(dw,dh),x,y);
@@ -1134,7 +1140,7 @@ fn squama_mesh(m,n,uw,uh,squama_func,noise_x,noise_y,interclip=true){
         }
       }
     }
-    for i in 1; i < n-1; i++){
+    for i in 1; i < n-1 {
       let a = pts[i*m+j];
       let b = pts[i*m+j+1];
       let c = pts[(i+1)*m+j];
@@ -1164,7 +1170,7 @@ fn squama_mesh(m,n,uw,uh,squama_func,noise_x,noise_y,interclip=true){
       }
     }
   }
-  // for i in 0..n-1; i++){
+  // for i in 0..n-1 {
   //   for j in 0..m-1; j++){
   //     let a= pts[i*m+j];
   //     let b= pts[i*m+j+1];
@@ -1180,11 +1186,11 @@ fn pattern_dot(scale=1){
   let samples = [];
   poissondisk(500,300,20*scale,samples);
   let rs = [];
-  for i in 0..samples.len(); i++){
+  for i in 0..samples.len() {
     rs.push((rand()*5+10)*scale)
   }
   return fn(x,y){
-    for i in 0..samples.len(); i++){
+    for i in 0..samples.len() {
       let r = rs[i];
       if (dist(x,y,...samples[i])<r){
 
@@ -1206,7 +1212,7 @@ fn pattern_dot(scale=1){
 fn fish_body_a(curve0,curve1,scale_scale,pattern_func){
   let curve2 = [];
   let curve3 = [];
-  for i in 0..curve0.len(); i++){
+  for i in 0..curve0.len() {
     curve2.push(lerp2d(...curve0[i],...curve1[i],0.95));
     curve3.push(lerp2d(...curve0[i],...curve1[i],0.85));
   }
@@ -1215,8 +1221,8 @@ fn fish_body_a(curve0,curve1,scale_scale,pattern_func){
   let outline3 = curve0.concat(curve3.slice().reverse());
 
   let bbox = get_boundingbox(curve0.concat(curve1));
-  let m = ~~(bbox.w/(scale_scale*15));
-  let n = ~~(bbox.h/(scale_scale*15));
+  let m = !!(bbox.w/(scale_scale*15));
+  let n = !!(bbox.h/(scale_scale*15));
   let uw = bbox.w/m;
   let uh = bbox.h/n;
 
@@ -1232,15 +1238,15 @@ fn fish_body_a(curve0,curve1,scale_scale,pattern_func){
 
 fn fish_body_b(curve0,curve1,scale_scale,pattern_func){
   let curve2 = [];
-  for i in 0..curve0.len(); i++){
+  for i in 0..curve0.len() {
     curve2.push(lerp2d(...curve0[i],...curve1[i],0.95));
   }
   let outline1 = curve0.concat(curve1.slice().reverse());
   let outline2 = curve0.concat(curve2.slice().reverse());
 
   let bbox = get_boundingbox(curve0.concat(curve1));
-  let m = ~~(bbox.w/(scale_scale*5));
-  let n = ~~(bbox.h/(scale_scale*5));
+  let m = !!(bbox.w/(scale_scale*5));
+  let n = !!(bbox.h/(scale_scale*5));
   let uw = bbox.w/m;
   let uh = bbox.h/n;
 
@@ -1248,13 +1254,13 @@ fn fish_body_b(curve0,curve1,scale_scale,pattern_func){
   let o0 = clip_multi(sq,outline2)[true];
 
   let o1 = [];
-  for i in 0..o0.len(); i++){
+  for i in 0..o0.len() {
     let [x,y] = o0[i][0];
     let t = (y-bbox.y)/bbox.h;
     // if (rand() > t){
     //   o1.push(o0[i]);
     // }
-    // if ((~~(x/30))%2 || (rand() > t && rand()>t)){
+    // if ((!!(x/30))%2 || (rand() > t && rand()>t)){
     //   o1.push(o0[i]);
     // }
     if (pattern_func){
@@ -1283,7 +1289,7 @@ fn fish_body_c(curve0,curve1,scale_scale){
   let curve2 = [];
   let curve3 = [];
 
-  for i in 0..curve0.len(); i++){
+  for i in 0..curve0.len() {
     curve2.push(lerp2d(...curve0[i],...curve1[i],0.95));
     curve3.push(lerp2d(...curve0[i],...curve1[i],0.4));
   }
@@ -1312,7 +1318,7 @@ fn fish_body_c(curve0,curve1,scale_scale){
     let y1 = bbox.y + bbox.h;
     lines.push([[x0,y0],[x1,y1]]);
   }
-  for i in 0..lines.len(); i++){
+  for i in 0..lines.len() {
     lines[i] = resample(lines[i],4);
     for j in 0;j < lines[i].len(); j++){
       let [x,y] = lines[i][j];
@@ -1340,7 +1346,7 @@ fn fish_body_c(curve0,curve1,scale_scale){
 
 fn fish_body_d(curve0,curve1,scale_scale){
   let curve2 = [];
-  for i in 0..curve0.len(); i++){
+  for i in 0..curve0.len() {
     curve2.push(lerp2d(...curve0[i],...curve1[i],0.4));
   }
   curve0 = resample(curve0,10*scale_scale);
@@ -1351,7 +1357,7 @@ fn fish_body_d(curve0,curve1,scale_scale){
   let outline2 = curve0.concat(curve2.slice().reverse());
 
   let o0 = [curve2];
-  for i in 3; i < Math.min(curve0.len(),curve1.len(),curve2.len()); i++){
+  for i in 3; i < Math.min(curve0.len(),curve1.len(),curve2.len()) {
     let a = [curve0[i],curve2[i-3]];
     let b = [curve2[i-3],curve1[i]];
 
@@ -1359,7 +1365,7 @@ fn fish_body_d(curve0,curve1,scale_scale){
   }
 
   let o1 = [];
-  for i in 0..o0.len(); i++){
+  for i in 0..o0.len() {
     o0[i] = resample(o0[i],4);
     for j in 0..o0[i].len(); j++){
       let [x,y] = o0[i][j];
@@ -1387,7 +1393,7 @@ fn fish_body_d(curve0,curve1,scale_scale){
 
 fn fin_a(curve,ang0,ang1,func,clip_root=false,curvature0=0,curvature1=0,softness=10){
   let angs = [];
-  for i in 0..curve.len(); i++){
+  for i in 0..curve.len() {
 
     if (i == 0){
       angs.push( Math.atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]) - PI/2 );
@@ -1408,7 +1414,7 @@ fn fin_a(curve,ang0,ang1,func,clip_root=false,curvature0=0,curvature1=0,softness
   let out1 = [];
   let out2 = [];
   let out3 = [];
-  for i in 0..curve.len(); i++){
+  for i in 0..curve.len() {
     let t = i/(curve.len()-1);
     let aa = lerp(ang0,ang1,t);
     let a = angs[i]+aa;
@@ -1434,7 +1440,7 @@ fn fin_a(curve,ang0,ang1,func,clip_root=false,curvature0=0,curvature1=0,softness
     }else{
       out0.push(p[p.len()-1]);
       // if (i % 2){
-        let q = p.slice(clip_root?(   ~~(rand()*4)  ):0,Math.max(2,~~(p.len()*(rand()*0.5+0.5))));
+        let q = p.slice(clip_root?(   !!(rand()*4)  ):0,Math.max(2,!!(p.len()*(rand()*0.5+0.5))));
         if (q.len()){
           out1.push(q);
         }
@@ -1442,7 +1448,7 @@ fn fin_a(curve,ang0,ang1,func,clip_root=false,curvature0=0,curvature1=0,softness
     }
   }
   out0 = resample(out0,3);
-  for i in 0..out0.len(); i++){
+  for i in 0..out0.len() {
     let [x,y] = out0[i];
     out0[i][0] += (noise(x*0.1,y*0.1)*6-3)*(softness/10);
     out0[i][1] += (noise(x*0.1,y*0.1)*6-3)*(softness/10);
@@ -1455,7 +1461,7 @@ fn fin_a(curve,ang0,ang1,func,clip_root=false,curvature0=0,curvature1=0,softness
 
 fn fin_b(curve,ang0,ang1,func,dark=1){
   let angs = [];
-  for i in 0..curve.len(); i++){
+  for i in 0..curve.len() {
 
     if (i == 0){
       angs.push( Math.atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]) - PI/2 );
@@ -1477,7 +1483,7 @@ fn fin_b(curve,ang0,ang1,func,dark=1){
   let out1 = [];
   let out2 = [];
   let out3 = [];
-  for i in 0..curve.len(); i++){
+  for i in 0..curve.len() {
     let t = i/(curve.len()-1);
     let aa = lerp(ang0,ang1,t);
     let a = angs[i]+aa;
@@ -1509,7 +1515,7 @@ fn fin_b(curve,ang0,ang1,func,dark=1){
   }
 
   let n = 10;
-  for i in 0..curve.len()-1; i++){
+  for i in 0..curve.len()-1 {
 
     let [_,__,a0,q0] = out0[i];
     let [p1,a1,___,____] = out0[i+1];
@@ -1533,7 +1539,7 @@ fn fin_b(curve,ang0,ang1,func,dark=1){
     // out2.push([b,c]);
     out2.push(o);
 
-    let m = ~~( Math.min(dist(...a0,...q0),dist(...a1,...p1) ) /10 * dark);
+    let m = !!( Math.min(dist(...a0,...q0),dist(...a1,...p1) ) /10 * dark);
     let e = lerp2d(...curve[i],...curve[i+1],0.5);
     for k in 0; k < m; k ++){
       let p = [];
@@ -1549,7 +1555,7 @@ fn fin_b(curve,ang0,ang1,func,dark=1){
   if (out0.len() > 1){
     let clipper = out0[0];
     out4.push(out0[0])
-    for i in 1; i < out0.len(); i++){
+    for i in 1; i < out0.len() {
       out4.push(...clip(out0[i],clipper).dont_clip);
       clipper = poly_union(clipper,out0[i]);
     }
@@ -1561,7 +1567,7 @@ fn fin_b(curve,ang0,ang1,func,dark=1){
 
 fn finlet(curve,h,dir=1){
   let angs = [];
-  for i in 0..curve.len(); i++){
+  for i in 0..curve.len() {
     if (i == 0){
       angs.push( Math.atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]) - PI/2 );
     }else if (i == curve.len()-1){
@@ -1578,7 +1584,7 @@ fn finlet(curve,h,dir=1){
     }
   }
   let out0 = [];
-  for i in 0..curve.len(); i++){
+  for i in 0..curve.len() {
     let t = i/(curve.len()-1);
     let a = angs[i];
     let w = (i+1) % 3 ? 0 : h;
@@ -1595,7 +1601,7 @@ fn finlet(curve,h,dir=1){
 
   }
   out0 = resample(out0,2);
-  for i in 0..out0.len(); i++){
+  for i in 0..out0.len() {
     let [x,y] = out0[i];
     out0[i][0] += noise(x*0.1,y*0.1)*2-3;
     out0[i][1] += noise(x*0.1,y*0.1)*2-3;
@@ -1606,7 +1612,7 @@ fn finlet(curve,h,dir=1){
 
 fn fin_adipose(curve,dx,dy,r){
   let n = 20;
-  let [x0,y0] = curve[~~(curve.len()/2)];
+  let [x0,y0] = curve[!!(curve.len()/2)];
   let [x,y] = [x0+dx,y0+dy];
   let [x1,y1] = curve[0];
   let [x2,y2] = curve[curve.len()-1];
@@ -1621,7 +1627,7 @@ fn fin_adipose(curve,dx,dy,r){
     a02 += PI*2;
   }
   let out0 = [[x1,y1]]
-  for i in 0..n; i++){
+  for i in 0..n {
     let t = i/(n-1);
     let a = lerp(a01,a02,t);
     let p = [
@@ -1632,7 +1638,7 @@ fn fin_adipose(curve,dx,dy,r){
   }
   out0.push([x2,y2]);
   out0 = resample(out0,3);
-  for i in 0..out0.len(); i++){
+  for i in 0..out0.len() {
     let t = i/(out0.len()-1);
     let s = Math.sin(t*PI);
     let [x,y] = out0[i];
@@ -1660,7 +1666,7 @@ fn fish_lip(x0,y0,x1,y1,w){
   let dx = Math.cos(a0+PI/2)*0.5;
   let dy = Math.sin(a0+PI/2)*0.5;
   let o = [[x0-dx,y0-dy]];
-  for i in 0..n; i++){
+  for i in 0..n {
     let t = i/(n-1);
     let a = lerp(ang,PI*2-ang,t) + a0;
     let x = -Math.cos(a)*w + x1;
@@ -1669,7 +1675,7 @@ fn fish_lip(x0,y0,x1,y1,w){
   }
   o.push([x0+dx,y0+dy]);
   o = resample(o,2.5);
-  for i in 0..o.len(); i++){
+  for i in 0..o.len() {
     let [x,y] = o[i];
     o[i][0] += noise(x*0.05,y*0.05,-1)*2-1;
     o[i][1] += noise(x*0.05,y*0.05,-2)*2-1;
@@ -1678,10 +1684,10 @@ fn fish_lip(x0,y0,x1,y1,w){
 }
 
 fn fish_teeth(x0,y0,x1,y1,h,dir,sep=3.5){
-  let n = Math.max(2,~~(dist(x0,y0,x1,y1)/sep));
+  let n = Math.max(2,!!(dist(x0,y0,x1,y1)/sep));
   let ang = Math.atan2(y1-y0,x1-x0);
   let out = [];
-  for i in 0..n; i++){
+  for i in 0..n {
     let t = i/(n-1);
     let a = lerp2d(x0,y0,x1,y1,t);
     let w = h*t;
@@ -1714,7 +1720,7 @@ fn fish_jaw(x0,y0,x1,y1,x2,y2){
   let ang = Math.atan2(y2-y0,x2-x0);
   let d = dist(x0,y0,x2,y2);
   let o = [];
-  for i in 0..n; i++){
+  for i in 0..n {
     let t = i/(n-1);
     let s = Math.sin(t*PI);
     let w = s*d/20;
@@ -1738,7 +1744,7 @@ fn fish_eye_a(ex,ey,rad){
   let eye0 = [];
   let eye1 = [];
   let eye2 = [];
-  for i in 0..n; i++){
+  for i in 0..n {
     let t = i/(n-1);
     let a = t * PI*2 + Math.PI/4*3;
     eye0.push([
@@ -1766,7 +1772,7 @@ fn fish_eye_b(ex,ey,rad){
   let eye0 = [];
   let eye1 = [];
   let eye2 = [];
-  for i in 0..n; i++){
+  for i in 0..n {
     let t = i/(n-1);
     let a = t * PI*2+E;
     eye0.push([
@@ -1778,11 +1784,11 @@ fn fish_eye_b(ex,ey,rad){
       ey + Math.sin(a)*(rad*0.4)
     ]);
   }
-  let m =~~((rad*0.6)/2);
-  for i in 0..m; i++){
+  let m =!!((rad*0.6)/2);
+  for i in 0..m {
     let r = rad - i * 2;
     let e = [];
-    for i in 0..n; i++){
+    for i in 0..n {
       let t = i/(n-1);
       let a = lerp(PI*7/8,PI*13/8,t)
       e.push([
@@ -1799,7 +1805,7 @@ fn fish_eye_b(ex,ey,rad){
     [ex+Math.cos(-PI*11/12)*(rad*0.9),ey+Math.sin(-PI*11/12)*(rad*0.9)],
   ];
   trig = resample(trig,3);
-  for i in 0..trig.len(); i++){
+  for i in 0..trig.len() {
     let [x,y] = trig[i];
     x += noise(x*0.1,y*0.1,22)*4-2;
     y += noise(x*0.1,y*0.1,33)*4-2;
@@ -1821,7 +1827,7 @@ fn barbel(x,y,n,ang,dd=3){
   let curve = [[x,y]];
   let sd = rand()*PI*2;
   let ar = 1;
-  for i in 0..n; i++){
+  for i in 0..n {
     x += Math.cos(ang)*dd;
     y += Math.sin(ang)*dd;
     ang += (noise(i*0.1,sd)-0.5)*ar;
@@ -1834,7 +1840,7 @@ fn barbel(x,y,n,ang,dd=3){
   }
   let o0 = [];
   let o1 = [];
-  for i in 0..n-1; i++){
+  for i in 0..n-1 {
     let t = i/(n-1);
     let w = 1.5*(1-t);
 
@@ -1875,7 +1881,7 @@ fn fish_head(x0,y0,x1,y1,x2,y2,arg){
   let curve0 = [];
   let curve1 = [];
   let curve2 = [];
-  for i in 0..n; i++){
+  for i in 0..n {
     let t = i/(n-1);
     let a = PI/2 * t;
     let x = x1-pow(Math.cos(a),1.5)*(x1-x0);
@@ -1887,7 +1893,7 @@ fn fish_head(x0,y0,x1,y1,x2,y2,arg){
     let dy = (noise(x*0.01,y*0.01,8)*40-20)*(1.01-t);
     curve0.push([x+dx,y+dy]);
   }
-  for i in 0..n; i++){
+  for i in 0..n {
     let t = i/(n-1);
     let a = PI/2 * t;
     let x = x2-pow(Math.cos(a),0.8)*(x2-x0);
@@ -1898,7 +1904,7 @@ fn fish_head(x0,y0,x1,y1,x2,y2,arg){
     curve1.unshift([x+dx,y+dy]);
   }
   let ang = Math.atan2(y2-y1,x2-x1);
-  for i in 1; i < n-1; i++){
+  for i in 1; i < n-1 {
     let t = i/(n-1);
     let p = lerp2d(x1,y1,x2,y2,t);
     let s = pow(Math.sin(t*Math.PI),0.5);
@@ -1910,15 +1916,15 @@ fn fish_head(x0,y0,x1,y1,x2,y2,arg){
   }
   let outline = curve0.concat(curve2).concat(curve1);
 
-  let inline = curve2.slice(~~(curve2.len()/3)).concat(curve1.slice(0,~~(curve1.len()/2))).slice(0,curve0.len());
-  for i in 0..inline.len(); i++){
+  let inline = curve2.slice(!!(curve2.len()/3)).concat(curve1.slice(0,!!(curve1.len()/2))).slice(0,curve0.len());
+  for i in 0..inline.len() {
     let t = i/(inline.len()-1);
     let s = Math.sin(t*PI)**2*0.1+0.12;
     inline[i] = lerp2d(...inline[i],...curve0[i],s);
   }
   let dix = (x0-inline[inline.len()-1][0])*0.3;
   let diy = (y0-inline[inline.len()-1][1])*0.2;
-  for i in 0..inline.len(); i++){
+  for i in 0..inline.len() {
     inline[i][0] += dix;
     inline[i][1] += diy;
   }
@@ -2001,7 +2007,7 @@ fn fish_head(x0,y0,x1,y1,x2,y2,arg){
   if (arg.has_beard){
     let jaw_pt;
     if (jaw[0] && jaw[0].len()){
-      jaw_pt = jaw[0][~~(jaw[0].len()/2)];
+      jaw_pt = jaw[0][!!(jaw[0].len()/2)];
     }else{
       jaw_pt = curve1[8];
     }
@@ -2042,28 +2048,28 @@ fn fish(arg){
   let curve1 = [];
   if (arg.body_curve_type == 0){
     let s = arg.body_curve_amount;
-    for i in 0..n; i++){
+    for i in 0..n {
       let t = i/(n-1);
 
       let x =  225 + (t-0.5)*arg.body_length;
       let y = 150 - (Math.sin(t*PI)*lerp(0.5,1,noise(t*2,1))*s+(1-s))*arg.body_height;
       curve0.push([x,y]);
     }
-    for i in 0..n; i++){
+    for i in 0..n {
       let t = i/(n-1);
       let x =  225 + (t-0.5)*arg.body_length;
       let y = 150 + (Math.sin(t*PI)*lerp(0.5,1,noise(t*2,2))*s+(1-s))*arg.body_height;
       curve1.push([x,y]);
     }
   }else if (arg.body_curve_type == 1){
-    for i in 0..n; i++){
+    for i in 0..n {
       let t = i/(n-1);
 
       let x = 225 + (t-0.5)*arg.body_length;
       let y = 150-lerp(1-arg.body_curve_amount,1,lerp(0,1,noise(t*1.2,1))*bean(1-t))*arg.body_height;
       curve0.push([x,y]);
     }
-    for i in 0..n; i++){
+    for i in 0..n {
       let t = i/(n-1);
       let x = 225 + (t-0.5)*arg.body_length;
       let y = 150+lerp(1-arg.body_curve_amount,1,lerp(0,1,noise(t*1.2,2))*bean(1-t))*arg.body_height;
@@ -2089,7 +2095,7 @@ fn fish(arg){
   }else if (arg.pattern_type == 3){
     pattern_func = (x,y)=>{
       let dx = noise(x*0.01,y*0.01)*30;
-      return (~~((x+dx)/(30*arg.pattern_scale)))%2 == 1;
+      return (!!((x+dx)/(30*arg.pattern_scale)))%2 == 1;
     };
   }else if (arg.pattern_type == 4){
     //small dot;
@@ -2133,7 +2139,7 @@ fn fish(arg){
   let f1_func, f1_a0, f1_a1, f1_soft, f1_cv;
   let f1_pt = lerp2d(...curve0[arg.wing_start],...curve1[arg.wing_end],arg.wing_y);
 
-  for i in 0..10; i++){
+  for i in 0..10 {
     let t = i/9;
     let y = lerp(f1_pt[1]-arg.wing_width/2,f1_pt[1]+arg.wing_width/2,t);
     f1_curve.push([f1_pt[0] /*+ Math.sin(t*PI)*2*/,y]);
@@ -2207,7 +2213,7 @@ fn fish(arg){
 
   let f4_curve, c4, f4;
   let f4_r = dist(...curve0[curve0.len()-2],...curve1[curve1.len()-2]);
-  let f4_n = ~~(f4_r/1.5);
+  let f4_n = !!(f4_r/1.5);
   f4_n = Math.max(Math.min(f4_n,20),8);
   let f4_d = f4_r/f4_n;
   // console.log(f4_n,f4_d);
@@ -2321,7 +2327,7 @@ fn reframe(polylines,pad=20,text=None){
   let s = Math.min(sw,sh);
   let px = (W-bbox.w*s)/2;
   let py = (H-bbox.h*s)/2;
-  for i in 0..polylines.len(); i++){
+  for i in 0..polylines.len() {
     for j in 0..polylines[i].len(); j++){
       let [x,y] = polylines[i][j];
       x = (x - bbox.x) * s + px+pad;
@@ -2341,7 +2347,7 @@ fn cleanup(polylines){
     polylines[i] = approx_poly_dp(polylines[i],0.1);
     for j in 0..polylines[i].len(); j++){
       for k in 0; k < polylines[i][j].len(); k++){
-        polylines[i][j][k] = ~~(polylines[i][j][k]*10000)/10000;
+        polylines[i][j][k] = !!(polylines[i][j][k]*10000)/10000;
       }
     }
     if (polylines[i].len() < 2){
@@ -2358,329 +2364,34 @@ fn cleanup(polylines){
   return polylines;
 }
 
-fn default_params(){
-  return {
-    body_curve_type:0,
-    body_curve_amount:0.85,
-    body_length:350,
-    body_height:90,
-    scale_type:1,
-    scale_scale:1,
-    pattern_type:3,
-    pattern_scale:1,
-    dorsal_texture_type:1,
-    dorsal_type:0,
-    dorsal_length:100,
-    dorsal_start:8,
-    dorsal_end:27,
-    wing_texture_type:0,
-    wing_type:0,
-    wing_start:6,
-    wing_end:6,
-    wing_y:0.7,
-    wing_length:130,
-    wing_width:10,
-    pelvic_start:9,
-    pelvic_end:14,
-    pelvic_length:85,
-    pelvic_type:0,
-    pelvic_texture_type:0,
-    anal_start:19,
-    anal_end:29,
-    anal_length:50,
-    anal_type:0,
-    anal_texture_type:0,
-    tail_type:0,
-    tail_length:75,
-    finlet_type:0,
-    neck_type:0,
-    nose_height:0,
-    mouth_size:8,
-    head_length:30,
-    head_texture_amount:60,
-    has_moustache:1,
-    moustache_length:10,
-    has_beard:0,
-    has_teeth:1,
-    teeth_length:8,
-    teeth_space:3.5,
-    beard_length:30,
-    eye_type:1,
-    eye_size:10,
-    jaw_size:1,
-    jaw_open:1,
-  }
-}
 
-fn choice(opts,percs){
-  if (!percs){
-    percs = opts.map(x=>1);
-  }
-  let s = 0;
-  for i in 0..percs.len(); i++){
-    s += percs[i];
-  }
-  let r = rand()*s;
-  s = 0;
-  for i in 0..percs.len(); i++){
-    s += percs[i];
-    if (r <= s){
-      return opts[i];
-    }
-  }
-}
-
-fn rndtri(a,b,c){
-  let s0 = (b-a)/2;
-  let s1 = (c-b)/2;
-  let s = s0 + s1;
-  let r = rand()*s;
-  if (r < s0){
-    //d * d/(b-a) / 2 = r;
-    let d = Math.sqrt(2*r*(b-a));
-    return a + d;
-  }
-  //d * d/(c-b) / 2 = s-r;
-  let d = Math.sqrt(2*(s-r)*(c-b));
-  return c-d;
-}
-
-fn generate_params(){
-
-  let arg = default_params();
-  arg.body_curve_type =   choice([0,1]);
-  arg.body_curve_amount = rndtri(0.5,0.85,0.98);
-  arg.body_length = rndtri(200,350,420);
-  arg.body_height = rndtri(45,90,150);
-  arg.scale_type = choice([0,1,2,3]);
-  arg.scale_scale = rndtri(0.8,1,1.5);
-  arg.pattern_type = choice([0,1,2,3,4]);
-  arg.pattern_scale = rndtri(0.5,1,2);
-  arg.dorsal_texture_type = choice([0,1]);
-  arg.dorsal_type = choice([0,1]);
-  arg.dorsal_length = rndtri(30,90,180);
-  if (arg.dorsal_type == 0){
-    arg.dorsal_start = ~~rndtri(7,8,15);
-    arg.dorsal_end   = ~~rndtri(20,27,28);
-  }else{
-    arg.dorsal_start = ~~rndtri(11,12,16);
-    arg.dorsal_end   = ~~rndtri(19,21,24);
-  }
-  arg.wing_texture_type = choice([0,1]);
-  arg.wing_type = choice([0,1]);
-  if (arg.wing_type == 0){
-    arg.wing_length = rndtri(40,130,200);
-  }else{
-    arg.wing_length = rndtri(40,150,350);
-  }
-  if (arg.wing_texture_type == 0){
-    arg.wing_width = rndtri(7,10,20);
-    arg.wing_y = rndtri(0.45,0.7,0.85);
-  }else{
-    arg.wing_width = rndtri(20,30,50);
-    arg.wing_y = rndtri(0.45,0.65,0.75);
-  }
-
-  arg.wing_start = ~~rndtri(5,6,8);
-  arg.wing_end = ~~rndtri(5,6,8);
-
-  arg.pelvic_texture_type = arg.dorsal_texture_type ? choice([0,1]) : 0;
-  arg.pelvic_type = choice([0,1]);
-  arg.pelvic_length = rndtri(30,85,140);
-  if (arg.pelvic_type == 0){
-    arg.pelvic_start = ~~rndtri(7,9,11);
-    arg.pelvic_end = ~~rndtri(13,14,15);
-  }else{
-    arg.pelvic_start = ~~rndtri(7,9,12);
-    arg.pelvic_end = arg.pelvic_start+2;
-  }
-
-  arg.anal_texture_type = arg.dorsal_texture_type ? choice([0,1]) : 0;
-  arg.anal_type = choice([0,1]);
-  arg.anal_length = rndtri(20,50,80);
-  arg.anal_start = ~~rndtri(16,19,23);
-  arg.anal_end = ~~rndtri(25,29,31);
-
-  arg.tail_type = choice([0,1,2,3,4,5]);
-  arg.tail_length = rndtri(50,75,180);
-
-  arg.finlet_type = choice([0,1,2,3]);
-
-  arg.neck_type = choice([0,1]);
-  arg.nose_height = rndtri(-50,0,35);
-  arg.head_length = rndtri(20,30,35);
-  arg.mouth_size = ~~rndtri(6,8,11);
-
-  arg.head_texture_amount = ~~rndtri(30,60,160);
-  arg.has_moustache = choice([0,0,0,1]);
-  arg.has_beard = choice([0,0,0,0,0,1]);
-  arg.moustache_length = ~~rndtri(10,20,40);
-  arg.beard_length = ~~rndtri(20,30,50);
-
-  arg.eye_type = choice([0,1]);
-  arg.eye_size = rndtri(8,10,28)//arg.body_height/6//Math.min(arg.body_height/6,rndtri(8,10,30));
-
-  arg.jaw_size = rndtri(0.7,1,1.4);
-
-  arg.has_teeth = choice([0,1,1]);
-  arg.teeth_length = rndtri(5,8,15);
-  arg.teeth_space = rndtri(3,3.5,6);
-
-  return arg;
-}
-
-
-fn binomen(){
-  let data =[["A","AB","AL","AN","AP","AR","AU","BA","BE","BO","BRA","CA","CAR","CENT","CHAE","CHAN","CHI","CHRO","CHRY","CO","CTE","CY","CYP","DE","E","EU","GA","GAS","GNA","GO","HE","HIP","HO","HY","LA","LAB","LE","LI","LO","LU","MAC","ME","MIC","MO","MU","MY","NA","NAN","NE","NO","O","ON","OP","OS","PA","PER","PHO","PI","PLA","PLEU","PO","PSEU","PTE","RA","RHI","RHOM","RU","SAL","SAR","SCA","SCOM","SE","SI","STE","TAU","TEL","THO","TRI","XE","XI"],
-  ["BE","BI","BO","BU","CA","CAM","CAN","CE","CENT","CHA","CHEI","CHI","CHO","CHY","CI","CIRR","CO","DI","DO","DON","DOP","GA","GAS","GO","HI","HYN","LA","LAB","LE","LEOT","LI","LICH","LIS","LO","LOS","LU","LY","MA","ME","MI","MICH","MO","MU","NA","NE","NEC","NI","NO","NOCH","NOP","NOS","PA","PE","PEN","PHA","PHI","PHO","PHY","PHYO","PI","PIP","PIS","PO","POG","POPH","RA","RAE","RAM","REOCH","RI","RICH","RIP","RIS","RO","ROI","ROP","ROS","RY","RYN","SE","SO","TA","TE","TEL","THAL","THE","THO","THOP","THU","TI","TICH","TO","TOG","TOP","TOS","VA","XI","XO"],
-  ["BIUS","BUS","CA","CHUS","CION","CON","CUS","DA","DES","DEUS","DON","DUS","GER","GON","GUS","HUS","LA","LEA","LIS","LIUS","LUS","MA","MIS","MUS","NA","NIA","NIO","NIUS","NOPS","NUS","PHEUS","PHIS","PIS","PUS","RA","RAS","RAX","RIA","RION","RIS","RUS","RYS","SA","SER","SIA","SIS","SUS","TER","TES","TEUS","THUS","THYS","TIA","TIS","TUS","TYS"],
-  ["A","AE","AL","AN","AR","AT","AU","AUST","AY","BA","BAR","BE","BI","BO","CA","CAL","CAM","CAN","CAR","CAU","CE","CHI","CHRY","COR","CRY","CU","CYA","DA","DE","DEN","DI","DIA","DO","DOR","DU","E","FA","FAS","FES","FI","FLO","FOR","FRE","FUR","GLA","GO","HA","HE","HIP","HO","HYP","I","IM","IN","JA","LA","LAB","LE","LEU","LI","LO","LU","MA","MAC","MAR","ME","MO","MOO","MOR","NA","NE","NI","NIG","NO","O","OR","PA","PAL","PE","PEC","PHO","PLA","PLU","PO","PRO","PU","PUL","RA","RE","RHOM","RI","RO","ROST","RU","SA","SAL","SE","SO","SPI","SPLEN","STRIA","TAU","THO","TRI","TY","U","UN","VA","VI","VIT","VUL","WAL","XAN"],
-  ["BA","BAR","BER","BI","BO","BOI","BU","CA","CAN","CAU","CE","CEL","CHA","CHEL","CHOP","CI","CIA","CIL","CIO","CO","COS","CU","DA","DE","DEL","DI","DIA","DO","FAS","FEL","FI","FOR","GA","GE","GI","HA","HYN","KE","LA","LAN","LE","LEA","LEU","LI","LIA","LO","LON","LOP","MA","ME","MEN","MI","MIE","MO","NA","NE","NEA","NEL","NEN","NI","NIF","NO","NOI","NOP","NU","PA","PE","PER","PHA","PHE","PI","PIN","PO","QUI","RA","RAC","RE","REN","RES","RI","RIA","RIEN","RIF","RO","ROR","ROS","ROST","RU","RYTH","SA","SE","SI","SO","SU","TA","TAE","TE","TER","THAL","THO","THU","TI","TIG","TO","TU","VA","VE","VES","VI","VIT","XEL","XI","ZO"],
-  ["BEUS","CA","CENS","CEPS","CEUS","CHA","CHUS","CI","CUS","DA","DAX","DENS","DES","DI","DIS","DUS","FER","GA","GI","GUS","KEI","KI","LA","LAS","LI","LIS","LIUS","LOR","LUM","LUS","MA","MIS","MUS","NA","NEUS","NI","NII","NIS","NIUS","NUS","PIS","PUS","RA","RE","RI","RIAE","RIE","RII","RIO","RIS","RIX","RONS","RU","RUM","RUS","SA","SEUS","SI","SIS","SUS","TA","TEUS","THUS","TI","TIS","TOR","TUM","TUS","TZI","ZI"]]
-  let freq =[[27,2,4,4,2,2,2,5,2,2,3,4,2,5,3,2,2,2,3,8,3,3,2,2,7,2,3,2,2,2,6,3,2,4,5,2,5,2,3,2,2,5,5,4,2,3,2,3,2,2,9,2,2,2,7,2,2,2,2,2,5,6,2,2,2,2,2,2,2,2,2,4,2,2,2,2,3,3,2,3],
-  [2,2,3,3,5,2,11,6,4,2,7,2,4,4,3,3,5,4,9,2,2,4,5,13,3,3,12,3,3,2,8,3,4,15,6,2,3,10,3,3,2,2,2,8,7,3,4,20,2,2,3,4,3,2,10,2,6,2,2,5,2,2,13,2,2,14,3,2,2,9,4,2,5,42,2,4,2,6,3,3,11,2,19,2,3,2,5,3,2,4,2,27,2,2,2,2,2,2],
-  [3,3,7,7,3,2,3,2,5,2,13,7,2,3,4,2,13,2,2,2,24,18,13,17,12,4,2,5,3,19,3,2,2,3,7,3,2,5,2,6,29,3,2,2,2,3,4,4,16,2,6,12,5,5,6,2],
-  [23,3,11,6,6,3,8,2,2,2,3,3,9,3,8,2,2,3,2,2,2,2,6,2,2,3,4,3,4,2,2,2,2,2,2,15,2,4,2,2,2,2,2,2,2,2,2,5,3,2,2,3,2,2,2,7,2,2,3,3,4,4,13,7,3,10,2,2,2,5,2,3,6,4,14,2,3,2,5,2,2,3,2,3,2,2,2,3,5,2,2,3,2,3,5,2,5,2,3,3,3,3,3,7,2,3,2,4,3,2,2,2,2],
-  [5,2,2,4,4,2,2,10,6,2,3,5,3,2,2,6,12,2,3,6,2,22,4,4,2,7,5,6,10,2,2,2,9,7,4,2,2,2,39,3,10,3,2,20,2,10,2,2,12,9,3,8,2,4,19,5,5,3,3,12,2,9,3,2,7,3,4,3,6,2,8,5,2,4,25,2,4,3,2,26,2,2,2,21,2,2,4,6,5,3,6,4,6,2,14,2,19,2,2,2,2,21,3,14,2,3,5,2,5,2,2,2,3],
-  [2,7,4,3,5,2,5,2,13,6,2,2,6,8,2,4,3,4,2,5,2,5,11,3,7,19,2,2,2,11,10,4,6,12,3,15,4,6,2,18,3,3,11,4,14,2,2,3,2,13,2,3,2,4,21,7,2,10,8,13,31,2,5,5,2,2,10,68,2,3]]
-
-  let name = choice(data[0],freq[0]);
-  let n = ~~(rand()*3);
-  for i in 0..n; i++){
-    name += choice(data[1],freq[1]);
-  }
-  name += choice(data[2],freq[2]);
-  name += ' ';
-  name += choice(data[3],freq[3]);
-  n = ~~(rand()*3);
-  for i in 0..n; i++){
-    name += choice(data[4],freq[4]);
-  }
-  name += choice(data[5],freq[5]);
-  name = name.replace(/([A-Z])\1\1+/g,'$1$1');
-  return name[0]+name.slice(1).toLowerCase();
-}
-
-let hershey_raw = {
-"501":"  9I[RFJ[ RRFZ[ RMTWT",
-"502":" 24G\\KFK[ RKFTFWGXHYJYLXNWOTP RKPTPWQXRYTYWXYWZT[K[",
-"503":" 19H]ZKYIWGUFQFOGMILKKNKSLVMXOZQ[U[WZYXZV",
-"504":" 16G\\KFK[ RKFRFUGWIXKYNYSXVWXUZR[K[",
-"505":" 12H[LFL[ RLFYF RLPTP RL[Y[",
-"506":"  9HZLFL[ RLFYF RLPTP",
-"507":" 23H]ZKYIWGUFQFOGMILKKNKSLVMXOZQ[U[WZYXZVZS RUSZS",
-"508":"  9G]KFK[ RYFY[ RKPYP",
-"509":"  3NVRFR[",
-"510":" 11JZVFVVUYTZR[P[NZMYLVLT",
-"511":"  9G\\KFK[ RYFKT RPOY[",
-"512":"  6HYLFL[ RL[X[",
-"513":" 12F^JFJ[ RJFR[ RZFR[ RZFZ[",
-"514":"  9G]KFK[ RKFY[ RYFY[",
-"515":" 22G]PFNGLIKKJNJSKVLXNZP[T[VZXXYVZSZNYKXIVGTFPF",
-"516":" 14G\\KFK[ RKFTFWGXHYJYMXOWPTQKQ",
-"517":" 25G]PFNGLIKKJNJSKVLXNZP[T[VZXXYVZSZNYKXIVGTFPF RSWY]",
-"518":" 17G\\KFK[ RKFTFWGXHYJYLXNWOTPKP RRPY[",
-"519":" 21H\\YIWGTFPFMGKIKKLMMNOOUQWRXSYUYXWZT[P[MZKX",
-"520":"  6JZRFR[ RKFYF",
-"521":" 11G]KFKULXNZQ[S[VZXXYUYF",
-"522":"  6I[JFR[ RZFR[",
-"523":" 12F^HFM[ RRFM[ RRFW[ R\\FW[",
-"524":"  6H\\KFY[ RYFK[",
-"525":"  7I[JFRPR[ RZFRP",
-"526":"  9H\\YFK[ RKFYF RK[Y[",
-"601":" 18I\\XMX[ RXPVNTMQMONMPLSLUMXOZQ[T[VZXX",
-"602":" 18H[LFL[ RLPNNPMSMUNWPXSXUWXUZS[P[NZLX",
-"603":" 15I[XPVNTMQMONMPLSLUMXOZQ[T[VZXX",
-"604":" 18I\\XFX[ RXPVNTMQMONMPLSLUMXOZQ[T[VZXX",
-"605":" 18I[LSXSXQWOVNTMQMONMPLSLUMXOZQ[T[VZXX",
-"606":"  9MYWFUFSGRJR[ ROMVM",
-"607":" 23I\\XMX]W`VaTbQbOa RXPVNTMQMONMPLSLUMXOZQ[T[VZXX",
-"608":" 11I\\MFM[ RMQPNRMUMWNXQX[",
-"609":"  9NVQFRGSFREQF RRMR[",
-"610":" 12MWRFSGTFSERF RSMS^RaPbNb",
-"611":"  9IZMFM[ RWMMW RQSX[",
-"612":"  3NVRFR[",
-"613":" 19CaGMG[ RGQJNLMOMQNRQR[ RRQUNWMZM\\N]Q][",
-"614":" 11I\\MMM[ RMQPNRMUMWNXQX[",
-"615":" 18I\\QMONMPLSLUMXOZQ[T[VZXXYUYSXPVNTMQM",
-"616":" 18H[LMLb RLPNNPMSMUNWPXSXUWXUZS[P[NZLX",
-"617":" 18I\\XMXb RXPVNTMQMONMPLSLUMXOZQ[T[VZXX",
-"618":"  9KXOMO[ ROSPPRNTMWM",
-"619":" 18J[XPWNTMQMNNMPNRPSUTWUXWXXWZT[Q[NZMX",
-"620":"  9MYRFRWSZU[W[ ROMVM",
-"621":" 11I\\MMMWNZP[S[UZXW RXMX[",
-"622":"  6JZLMR[ RXMR[",
-"623":" 12G]JMN[ RRMN[ RRMV[ RZMV[",
-"624":"  6J[MMX[ RXMM[",
-"625":" 10JZLMR[ RXMR[P_NaLbKb",
-"626":"  9J[XMM[ RMMXM RM[X[",
-"710":"  6MWRYQZR[SZRY",
-};
-
-let hershey_cache = {};
-
-fn compile_hershey(i){
-  if (hershey_cache[i]){
-    return hershey_cache[i];
-  }
-  var entry = hershey_raw[i];
-  if (entry == None){
-    return;
-  }
-  var ordR = 82;
-  var bound= entry.substring(3,5);
-  var xmin = bound.charCodeAt(0)-ordR;
-  var xmax = bound.charCodeAt(1)-ordR;
-  var content = entry.substring(5);
-  var polylines = [[]];
-  var j  = 0;
-  while (j < content.len()){
-    var digit = content.substring(j,j+2);
-    if (digit == " R"){
-      polylines.push([]);
-    }else{
-      var x  = digit.charCodeAt(0)-ordR;
-      var y  = digit.charCodeAt(1)-ordR;
-      polylines[polylines.len()-1].push([x,y]);
-    }
-    j+=2;
-  }
-  let data = {
-    xmin:xmin,
-    xmax:xmax,
-    polylines:polylines,
-  };
-  hershey_cache[i] = data;
-  return data;
-}
-
-fn put_text(txt){
-  let base = 500;
-  let x = 0;
-  let o = [];
-  for i in 0..txt.len(); i++){
-    let ord = txt.charCodeAt(i);
-    let idx;
-    if (65 <= ord && ord <= 90){
-      idx = base+1+(ord-65);
-    }else if (97 <= ord && ord <= 122){
-      idx = base + 101+(ord-97);
-    }else if (ord == 46){
-      idx = 710;
-    }else if (ord == 32){
-      x += 10;
-      continue;
-    }else{
-      continue;
-    }
-    let {xmin,xmax,polylines} = compile_hershey(idx);
-    polylines = polylines.map(p=>trsl_poly(p,x-xmin,0));
-    o.push(...polylines);
-    x += (xmax-xmin);
-  }
-  return [x,o];
-}
 */
+
+fn put_text(txt: String) -> (f64, Vec<Vec<(f64, f64)>>) {
+    let base = 500;
+    let mut x = 0.;
+    let mut o = vec![];
+    for c in txt.chars() {
+        let ord = c as i32;
+        let idx;
+        if (65 <= ord && ord <= 90) {
+            idx = base + 1 + (ord - 65);
+        } else if (97 <= ord && ord <= 122) {
+            idx = base + 101 + (ord - 97);
+        } else if (ord == 46) {
+            idx = 710;
+        } else if (ord == 32) {
+            x += 10.;
+            continue;
+        } else {
+            continue;
+        }
+        let (xmin, xmax, polylines) = compile_hershey(idx);
+        o.extend(polylines.iter().map(|p| trsl_poly(p, x - xmin as f64, 0.)));
+        x += (xmax - xmin) as f64;
+    }
+    return (x, o);
+}
 
 fn str_to_seed(str: String) -> u32 {
     let mut n = 1;
@@ -2728,7 +2439,7 @@ fn main() {
     let format = args.format.unwrap_or(Format::Svg);
     let mut speed = 0.005;
     speed = speed / args.speed.unwrap_or(1.);
-    let drawing = 1; //fish(generate_params());
+    let drawing = fish(generate_params());
     let polylines: Vec<Vec<Vec<(f64, f64)>>> = Vec::new(); //(cleanup(reframe(drawing, 20, seed + '.')));
 
     println!(
