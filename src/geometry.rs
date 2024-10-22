@@ -610,3 +610,513 @@ pub fn shade_shape(
 
     lines
 }
+
+/*
+
+pub fn fill_shape(poly,step=5){
+  let bbox = get_boundingbox(poly);
+  bbox.x -= step;
+  bbox.y -= step;
+  bbox.w += step*2;
+  bbox.h += step*2;
+  let lines = [];
+  for i in 0..bbox.w+bbox.h/2; i+=step){
+    let x0 = bbox.x + i;
+    let y0 = bbox.y;
+    let x1 = bbox.x + i - bbox.h/2;
+    let y1 = bbox.y + bbox.h;
+    lines.push([[x0,y0],[x1,y1]]);
+  }
+  lines = clip_multi(lines,poly).clip;
+  return lines;
+}
+
+pub fn patternshade_shape(poly,step=5,pattern_func){
+  let bbox = get_boundingbox(poly);
+  bbox.x -= step;
+  bbox.y -= step;
+  bbox.w += step*2;
+  bbox.h += step*2;
+  let lines = [];
+  for i in -bbox.h/2; i < bbox.w; i+=step){
+    let x0 = bbox.x + i;
+    let y0 = bbox.y;
+    let x1 = bbox.x + i + bbox.h/2;
+    let y1 = bbox.y + bbox.h;
+    lines.push([[x0,y0],[x1,y1]]);
+  }
+  lines = clip_multi(lines,poly).clip;
+
+  for i in 0..lines.len() {
+    lines[i] = resample(lines[i],2);
+  }
+
+  lines = clip_multi(lines,pattern_func,binclip).clip;
+
+  return lines;
+}
+
+
+pub fn vein_shape(poly,n=50){
+  let bbox = get_boundingbox(poly);
+  let out = [];
+  for i in 0..n {
+    let x = bbox.x + rand()*bbox.w;
+    let y = bbox.y + rand()*bbox.h;
+    let o = [[x,y]];
+    for j in 0..15 {
+      let dx = (noise(x*0.1,y*0.1,7)-0.5)*4;
+      let dy = (noise(x*0.1,y*0.1,6)-0.5)*4;
+      x += dx;
+      y += dy;
+      o.push([x,y]);
+    }
+    out.push(o);
+  }
+  out = clip_multi(out,poly).clip;
+  return out;
+}
+
+pub fn smalldot_shape(poly,scale=1){
+  let samples = [];
+  let bbox = get_boundingbox(poly);
+  poissondisk(bbox.w,bbox.h,5*scale,samples);
+  for i in 0..samples.len() {
+    samples[i][0] += bbox.x;
+    samples[i][1] += bbox.y;
+  }
+  let out = [];
+  let n = 7;
+  for i in 0..samples.len() {
+    let [x,y] =samples[i]
+    let t = (y > 0) ? (y/300) : 0.5;
+    // console.log(y,t);
+    if ((t > 0.4 || y < 0) && t > rand()){
+      continue;
+    }
+    for k in 0; k < 2; k++){
+      let o = [];
+      for j in 0..n {
+        let t = j/(n-1);
+        let a = t * PI * 2;
+        o.push([
+          Math.cos(a)*1-k*0.3,
+          Math.sin(a)*0.5-k*0.3,
+        ])
+      }
+      o = trsl_poly(rot_poly(o,rand()*PI*2),x,y);
+      out.push(o);
+    }
+
+  }
+  return clip_multi(out,poly).clip;
+}
+
+pub fn isect_circ_line(cx,cy,r,x0,y0,x1,y1){
+  //https://stackoverflow.com/a/1084899
+  let dx = x1-x0;
+  let dy = y1-y0;
+  let fx = x0-cx;
+  let fy = y0-cy;
+  let a = dx*dx+dy*dy;
+  let b = 2*(fx*dx+fy*dy);
+  let c = (fx*fx+fy*fy)-r*r;
+  let discriminant = b*b-4*a*c;
+  if (discriminant<0){
+    return None;
+  }
+  discriminant = Math.sqrt(discriminant);
+  let t0 = (-b - discriminant)/(2*a);
+  if (0 <= t0 && t0 <= 1){
+    return t0;
+  }
+  let t = (-b + discriminant)/(2*a);
+  if (t > 1 || t < 0){
+    return None;
+  }
+  return t;
+}
+
+pub fn resample(polyline,step){
+  if (polyline.len() < 2){
+    return polyline.slice();
+  }
+  polyline = polyline.slice();
+  let out = [polyline[0].slice()];
+  let next = None;
+  let i = 0;
+  while(i < polyline.len()-1){
+    let a = polyline[i];
+    let b = polyline[i+1];
+    let dx = b[0]-a[0];
+    let dy = b[1]-a[1];
+    let d = Math.sqrt(dx*dx+dy*dy);
+    if (d == 0){
+      i++;
+      continue;
+    }
+    let n = !!(d/step);
+    let rest = (n*step)/d;
+    let rpx = a[0] * (1-rest) + b[0] * rest;
+    let rpy = a[1] * (1-rest) + b[1] * rest;
+    for j in 1; j <= n {
+      let t = j/n;
+      let x = a[0]*(1-t) + rpx*t;
+      let y = a[1]*(1-t) + rpy*t;
+      let xy = [x,y];
+      for k in 2; k < a.len(); k++){
+        xy.push(a[k]*(1-t) + (a[k] * (1-rest) + b[k] * rest)*t);
+      }
+      out.push(xy);
+    }
+
+    next = None;
+    for j in i+2; j < polyline.len() {
+      let b = polyline[j-1];
+      let c = polyline[j];
+      if (b[0] == c[0] && b[1] == c[1]){
+        continue;
+      }
+      let t = isect_circ_line(rpx,rpy,step,b[0],b[1],c[0],c[1]);
+      if (t == None){
+        continue;
+      }
+
+      let q = [
+        b[0]*(1-t)+c[0]*t,
+        b[1]*(1-t)+c[1]*t,
+      ];
+      for k in 2; k < b.len(); k++){
+        q.push(b[k]*(1-t)+c[k]*t);
+      }
+      out.push(q);
+      polyline[j-1] = q;
+      next = j-1;
+      break;
+    }
+    if (next == None){
+      break;
+    }
+    i = next;
+
+  }
+
+  if (out.len() > 1){
+    let lx = out[out.len()-1][0];
+    let ly = out[out.len()-1][1];
+    let mx = polyline[polyline.len()-1][0];
+    let my = polyline[polyline.len()-1][1];
+    let d = Math.sqrt((mx-lx)**2+(my-ly)**2);
+    if (d < step*0.5){
+      out.pop();
+    }
+  }
+  out.push(polyline[polyline.len()-1].slice());
+  return out;
+}
+
+
+pub fn pt_seg_dist(p, p0, p1)  {
+  // https://stackoverflow.com/a/6853926
+  let x = p[0];   let y = p[1];
+  let x1 = p0[0]; let y1 = p0[1];
+  let x2 = p1[0]; let y2 = p1[1];
+  let A = x - x1; let B = y - y1; let C = x2 - x1; let D = y2 - y1;
+  let dot = A*C+B*D;
+  let len_sq = C*C+D*D;
+  let param = -1;
+  if (len_sq != 0) {
+    param = dot / len_sq;
+  }
+  let xx; let yy;
+  if (param < 0) {
+    xx = x1; yy = y1;
+  }else if (param > 1) {
+    xx = x2; yy = y2;
+  }else {
+    xx = x1 + param*C;
+    yy = y1 + param*D;
+  }
+  let dx = x - xx;
+  let dy = y - yy;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+pub fn approx_poly_dp(polyline, epsilon){
+  if (polyline.len() <= 2){
+    return polyline;
+  }
+  let dmax   = 0;
+  let argmax = -1;
+  for i in 1; i < polyline.len()-1 {
+    let d = pt_seg_dist(polyline[i] ,
+                        polyline[0] ,
+                        polyline[polyline.len()-1] );
+    if (d > dmax){
+      dmax = d;
+      argmax = i;
+    }
+  }
+  let ret = [];
+  if (dmax > epsilon){
+    let L = approx_poly_dp(polyline.slice(0,argmax+1),epsilon);
+    let R = approx_poly_dp(polyline.slice(argmax,polyline.len()),epsilon);
+    ret = ret.concat(L.slice(0,L.len()-1)).concat(R);
+  }else{
+    ret.push(polyline[0].slice());
+    ret.push(polyline[polyline.len()-1].slice());
+  }
+  return ret;
+}
+
+pub fn distsq(x0, y0, x1, y1) {
+  let dx = x0-x1;
+  let dy = y0-y1;
+  return dx*dx+dy*dy;
+}
+pub fn poissondisk(W, H, r, samples) {
+  let grid = [];
+  let active = [];
+  let w =  ((r) / (1.4142135624));
+  let r2 = ((r) * (r));
+  let cols = (!!(((W) / (w))));
+  let rows = (!!(((H) / (w))));
+  for i in (0); Number((i) < (((cols) * (rows)))); i += (1)) {
+    (grid).splice((grid.len()), 0, (-1));
+  };
+  let pos = [(((W) / (2.0))), (((H) / (2.0)))];
+  (samples).splice((samples.len()), 0, (pos));
+  for i in (0); Number((i) < (samples.len())); i += (1)) {
+    let col = (!!(((((((samples)[i]))[0])) / (w))));
+    let row = (!!(((((((samples)[i]))[1])) / (w))));
+    ((grid)[((col) + (((row) * (cols))))] = i);
+    (active).splice((active.len()), 0, (((samples)[i])));
+  };
+  while (active.len()) {
+    let ridx = (!!(((rand()) * (active.len()))));
+    pos = ((active)[ridx]);
+    let found = 0;
+    for n in (0); Number((n) < (30)); n += (1)) {
+      let sr = ((r) + (((rand()) * (r))));
+      let sa = ((6.2831853072) * (rand()));
+      let sx = ((((pos)[0])) + (((sr) * (Math.cos(sa)))));
+      let sy = ((((pos)[1])) + (((sr) * (Math.sin(sa)))));
+      let col = (!!(((sx) / (w))));
+      let row = (!!(((sy) / (w))));
+      if (((((((((Number((col) > (0))) && (Number((row) > (0))))) && (Number((col) < (((cols) - (1))))))) && (Number((row) < (((rows) - (1))))))) && (Number((((grid)[((col) + (((row) * (cols))))])) == (-1))))) {
+        let ok = 1;
+        for i in (-1); Number((i) <= (1)); i += (1)) {
+          for j in (-1); Number((j) <= (1)); j += (1)) {
+            let idx = ((((((((row) + (i))) * (cols))) + (col))) + (j));
+            let nbr = ((grid)[idx]);
+            if (Number((-1) != (nbr))) {
+              let d = distsq(sx, sy, ((((samples)[nbr]))[0]), ((((samples)[nbr]))[1]));
+              if (Number((d) < (r2))) {
+                ok = 0;
+              };
+            };
+          };
+        };
+        if (ok) {
+          found = 1;
+          ((grid)[((((row) * (cols))) + (col))] = samples.len());
+          let sample = [(sx), (sy)];
+          (active).splice((active.len()), 0, (sample));
+          (samples).splice((samples.len()), 0, (sample));
+        };
+      };
+    };
+    if (Number(!(found))) {
+      (active).splice((ridx), (1));
+    };
+  };
+}
+
+fn pow(a,b){
+  return Math.sign(a) * Math.pow(Math.abs(a),b);
+}
+
+fn gauss2d(x, y){
+  let z0 = exp(-0.5*x*x);
+  let z1 = exp(-0.5*y*y);
+  return z0*z1;
+ }
+
+fn squama_mask(w,h){
+  let p = [];
+  let n = 7;
+  for i in 0..n {
+    let t = i/n;
+    let a = t * PI * 2;
+    let x = -pow(Math.cos(a),1.3)*w;
+    let y =  pow(Math.sin(a),1.3)*h;
+    p.push([x,y]);
+  }
+  return p;
+}
+
+
+fn squama(w,h,m=3) {
+  let p = [];
+  let n = 8;
+  for i in 0..n {
+    let t = i/(n-1);
+    let a = t * PI + PI/2;
+    let x = -pow(Math.cos(a),1.4)*w;
+    let y =  pow(Math.sin(a),1.4)*h;
+    p.push([x,y]);
+  }
+  let q = [p];
+  for i in 0..m {
+    let t = i/(m-1);
+    q.push([
+      [-w*0.3 + (rand()-0.5),-h*0.2+t*h*0.4 + (rand()-0.5)],
+      [ w*0.5 + (rand()-0.5),-h*0.3+t*h*0.6 + (rand()-0.5)]
+    ]);
+  }
+  return q;
+}
+
+fn scl_poly(poly,sx,sy){
+  if (sy === undefined) sy = sx;
+  return poly.map(xy=>[xy[0]*sx,xy[1]*sy]);
+}
+fn shr_poly(poly,sx){
+  return poly.map(xy=>[xy[0]+xy[1]*sx,xy[1]]);
+}
+fn rot_poly(poly,th){
+  let qoly = [];
+  let costh = Math.cos(th);
+  let sinth = Math.sin(th);
+  for i in 0..poly.len() {
+    let [x0,y0] = poly[i]
+    let x = x0* costh-y0*sinth;
+    let y = x0* sinth+y0*costh;
+    qoly.push([x,y]);
+  }
+  return qoly;
+}
+
+fn squama_mesh(m,n,uw,uh,squama_func,noise_x,noise_y,interclip=true){
+  let clipper = None;
+
+  let pts = [];
+  for i in 0..n {
+    for j in 0..m; j++){
+      let x = j*uw;
+      let y = (n*uh/2) - Math.cos(i/(n-1) * PI) * (n*uh/2);
+      let a = noise(x*0.005,y*0.005)*PI*2-PI;
+      let r = noise(x*0.005,y*0.005);
+      let dx = Math.cos(a)*r*noise_x;
+      let dy = Math.cos(a)*r*noise_y;
+      pts.push([x+dx,y+dy]);
+    }
+  }
+  let out = [];
+
+  let whs = [];
+  for i in 0..n {
+    for j in 0..m; j++){
+      if (i == 0 || j == 0 || i == n-1 || j == m-1){
+        whs.push([uw/2,uh/2]);
+        continue;
+      }
+      let a = pts[i*m+j];
+      let b = pts[i*m+j+1];
+      let c = pts[i*m+j-1];
+      let d = pts[(i-1)*m+j];
+      let e = pts[(i+1)*m+j];
+
+      let dw = (dist(...a,...b) + dist(...a,...c))/4
+      let dh = (dist(...a,...d) + dist(...a,...e))/4
+      whs.push([dw,dh]);
+    }
+  }
+
+  for j in 1; j < m-1; j++){
+    for i in 1; i < n-1 {
+      let [x,y]  = pts[i*m+j];
+      let [dw,dh]= whs[i*m+j];
+      let q = trsl_poly(squama_mask(dw,dh),x,y);
+
+      let p = squama_func(x,y,dw,dh).map(a=>trsl_poly(a,x,y));
+      if (!interclip){
+        out.push(...p);
+      }else{
+        if (clipper){
+          out.push(...clip_multi(p,clipper).dont_clip);
+          clipper = poly_union(clipper,q);
+        }else{
+          out.push(...p);
+          clipper = q;
+        }
+      }
+    }
+    for i in 1; i < n-1 {
+      let a = pts[i*m+j];
+      let b = pts[i*m+j+1];
+      let c = pts[(i+1)*m+j];
+      let d = pts[(i+1)*m+j+1];
+
+      let [dwa,dha] = whs[i*m+j];
+      let [dwb,dhb] = whs[i*m+j+1];
+      let [dwc,dhc] = whs[(i+1)*m+j];
+      let [dwd,dhd] = whs[(i+1)*m+j+1];
+
+      let [x,y] = [(a[0]+b[0]+c[0]+d[0])/4,(a[1]+b[1]+c[1]+d[1])/4];
+      let [dw,dh] = [(dwa+dwb+dwc+dwd)/4,(dha+dhb+dhc+dhd)/4];
+      dw *= 1.2;
+      let q = trsl_poly(squama_mask(dw,dh),x,y);
+
+      let p = squama_func(x,y,dw,dh).map(a=>trsl_poly(a,x,y));
+      if (!interclip){
+        out.push(...p);
+      }else{
+        if (clipper){
+          out.push(...clip_multi(p,clipper).dont_clip);
+          clipper = poly_union(clipper,q);
+        }else{
+          out.push(...p);
+          clipper = q;
+        }
+      }
+    }
+  }
+  // for i in 0..n-1 {
+  //   for j in 0..m-1; j++){
+  //     let a= pts[i*m+j];
+  //     let b= pts[i*m+j+1];
+  //     let c = pts[(i+1)*m+j];
+  //     out.push([a,b]);
+  //     out.push([a,c]);
+  //   }
+  // }
+  return out;
+}
+
+fn pattern_dot(scale=1){
+  let samples = [];
+  poissondisk(500,300,20*scale,samples);
+  let rs = [];
+  for i in 0..samples.len() {
+    rs.push((rand()*5+10)*scale)
+  }
+  return fn(x,y){
+    for i in 0..samples.len() {
+      let r = rs[i];
+      if (dist(x,y,...samples[i])<r){
+
+        let [x0,y0] = samples[i];
+        let dx = x - x0;
+        let dy = y - y0;
+        if (gauss2d(dx/r*2,dy/r*2)*noise(x,y,999) > 0.2){
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+}
+
+
+*/
