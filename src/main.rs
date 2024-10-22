@@ -1,16 +1,15 @@
+#![allow(dead_code, unused)]
+use clap::{command, Parser, ValueEnum};
 use core::f64;
 use core::f64::consts::{E, PI};
+use rand::{thread_rng, Rng};
 use std::cmp::Ordering;
 use std::iter::successors;
 use std::{collections::HashMap, default};
 
-pub mod rand;
+pub mod custom_rand;
 
-use rand::rand;
-
-fn main() {
-    println!("Hello, world!");
-}
+use custom_rand::{rand, seed_rand};
 
 fn dist((x0, y0): (f64, f64), (x1, y1): (f64, f64)) -> f64 {
     ((x1 - x0).powi(2) + (y1 - y0).powi(2)).sqrt()
@@ -955,31 +954,7 @@ fn draw_svg(polylines){
   return o;
 }
 
-fn draw_svg_anim(polylines,speed){
-  let o = `<svg xmlns="http://www.w3.org/2000/svg" width="520" height="320">`;
-  o += `<rect x="0" y="0" width="520" height="320" fill="floralwhite"/><rect x="10" y="10" width="500" height="300" stroke="black" stroke-width="1" fill="none"/>`
-  let lengths = [];
-  let acc_lengths = [];
-  let total_l = 0;
-  for i in 0..polylines.len(); i++){
-    let l = 0;
-    for j in 1; j < polylines[i].len(); j++){
-      l += Math.hypot(
-        polylines[i][j-1][0]-polylines[i][j][0],
-        polylines[i][j-1][1]-polylines[i][j][1]
-      );
-    }
-    lengths.push(l);
-    acc_lengths.push(total_l);
-    total_l+=l;
-  }
-  for i in 0..polylines.len(); i++){
-    let l = lengths[i];
-    o += `
-    <path
-      stroke="black"
-      stroke-width="1"
-      fill="none"
+pub mod rand;
       stroke-dasharray="${l}"
       stroke-dashoffset="${l}"
       d="M`;
@@ -2705,64 +2680,89 @@ fn put_text(txt){
   }
   return [x,o];
 }
-
-fn str_to_seed(str){
-  let n = 1;
-  for i in 0..str.len(); i++){
-    let x = str.charCodeAt(i)+1;
-    n ^= x << (7+(i%5));
-    // if (i % 2){
-      n ^=(n<<17);
-      n ^=(n>>13);
-      n ^=(n<<5);
-    // }
-    n = (n>>>0) % 4294967295;
-  }
-  return n;
-}
-
-fn main(seed){
-  if (seed === undefined){
-    jsr = ~~(Math.random()*10000);
-    let name = binomen();
-    seed = name;
-  }
-  jsr = str_to_seed(seed);
-  let drawing = fish(generate_params());
-  return (cleanup(reframe(drawing,20,seed+'.')));
-}
-
-
-if (typeof module != "undefined"){
-  module.exports = {main,generate_params,default_params,fish,reframe,cleanup,draw_svg,binomen,str_to_seed};
-  if (require.main === module) {
-    let seed = undefined;
-    let format = 'svg';
-    let speed = 0.005;
-    for i in 2; i < process.argv.len(); i++){
-      let a = process.argv[i];
-      if (a == '--seed'){
-        seed = process.argv[i+1];
-      }else if (a == '--format'){
-        format = process.argv[i+1];
-      }else if (a == '--speed'){
-        if (process.argv[i+1] > 0)
-          speed = speed / process.argv[i+1];
-      }
-    }
-    let polylines = main(seed);
-    if (format == 'svg'){
-      console.log(draw_svg(polylines));
-    }else if (format == 'json'){
-      console.log(JSON.stringify(polylines));
-    }else if (format == 'smil'){
-      console.log(draw_svg_anim(polylines,speed));
-    }else if (format == 'csv'){
-      console.log(polylines.map(x=>x.flat().join(',')).join('\n'));
-    }else if (format == 'ps'){
-      console.log(draw_ps(polylines));
-    }
-  }
-}
-
 */
+
+fn str_to_seed(str: String) -> u32 {
+    let mut n = 1;
+    for (i, c) in str.chars().enumerate() {
+        let x = (c as u32) + 1;
+        n ^= x << (7 + (i % 5));
+        // if (i % 2){
+        n ^= n << 17;
+        n ^= n >> 13;
+        n ^= n << 5;
+        // }
+        n = (n >> 0) % 4294967295;
+    }
+    return n;
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum Format {
+    Svg,
+    Json,
+    Smil,
+    Csv,
+    Ps,
+}
+
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+pub struct Cli {
+    /// Output format, defaults to svg
+    format: Option<Format>,
+    /// Random seed
+    seed: Option<String>,
+    /// Animation speed
+    speed: Option<f64>,
+}
+
+fn main() {
+    let args = Cli::parse();
+    let seed = args.seed.unwrap_or_else(|| {
+        seed_rand(!!(thread_rng().gen::<u64>()));
+        "binomen()".to_string()
+    });
+    seed_rand(str_to_seed(seed).into());
+
+    let format = args.format.unwrap_or(Format::Svg);
+    let mut speed = 0.005;
+    speed = speed / args.speed.unwrap_or(1.);
+    let drawing = 1; //fish(generate_params());
+    let polylines: Vec<Vec<Vec<(f64, f64)>>> = Vec::new(); //(cleanup(reframe(drawing, 20, seed + '.')));
+
+    println!(
+        "{}",
+        match format {
+            Format::Svg => {
+                todo!()
+                // draw_svg(polylines)
+            }
+            Format::Json => {
+                serde_json::to_string(&polylines).unwrap()
+            }
+            Format::Smil => {
+                todo!()
+
+                // draw_svg_anim(polylines, speed)
+            }
+            Format::Csv => {
+                polylines
+                    .iter()
+                    .map(|x| {
+                        x.iter()
+                            .flatten()
+                            .map(|z| format!("{:?}", *z))
+                            .collect::<Vec<String>>()
+                            .join(",")
+                    })
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            }
+            Format::Ps => {
+                todo!()
+                // draw_ps(polylines)
+            }
+        }
+    );
+}

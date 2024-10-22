@@ -17,6 +17,10 @@ pub fn rand() -> u64 {
     return (reg >> 0) / 4294967295;
 }
 
+pub fn seed_rand(seed: u64) {
+    JSR.store(seed, Ordering::SeqCst);
+}
+
 const PERLIN_YWRAPB: u64 = 4;
 const PERLIN_YWRAP: u64 = 1 << PERLIN_YWRAPB;
 const PERLIN_ZWRAPB: u64 = 8;
