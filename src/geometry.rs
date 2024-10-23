@@ -440,8 +440,8 @@ pub fn seg_isect_poly(
 
 #[derive(Default)]
 pub struct ClipSegments {
-    clip: Vec<Polyline>,
-    dont_clip: Vec<Polyline>,
+    pub clip: Vec<Polyline>,
+    pub dont_clip: Vec<Polyline>,
 }
 
 impl ClipSegments {
@@ -736,86 +736,82 @@ pub fn isect_circ_line(cx,cy,r,x0,y0,x1,y1){
   }
   return t;
 }
-
-pub fn resample(polyline,step){
-  if (polyline.len() < 2){
-    return polyline.slice();
-  }
-  polyline = polyline.slice();
-  let out = [polyline[0].slice()];
-  let next = None;
-  let i = 0;
-  while(i < polyline.len()-1){
-    let a = polyline[i];
-    let b = polyline[i+1];
-    let dx = b[0]-a[0];
-    let dy = b[1]-a[1];
-    let d = Math.sqrt(dx*dx+dy*dy);
-    if (d == 0){
-      i++;
-      continue;
+*/
+pub fn resample(polyline_slice: &[Point], step: f64) -> Vec<Point> {
+    let mut polyline = polyline_slice.to_vec();
+    if (polyline_slice.len() < 2) {
+        return polyline;
     }
-    let n = !!(d/step);
-    let rest = (n*step)/d;
-    let rpx = a[0] * (1-rest) + b[0] * rest;
-    let rpy = a[1] * (1-rest) + b[1] * rest;
-    for j in 1; j <= n {
-      let t = j/n;
-      let x = a[0]*(1-t) + rpx*t;
-      let y = a[1]*(1-t) + rpy*t;
-      let xy = [x,y];
-      for k in 2; k < a.len(); k++){
-        xy.push(a[k]*(1-t) + (a[k] * (1-rest) + b[k] * rest)*t);
-      }
-      out.push(xy);
+    let mut out = vec![polyline[0]];
+    let mut next = None;
+    let mut i = 0;
+    while (i < polyline.len() - 1) {
+        let a = polyline[i];
+        let b = polyline[i + 1];
+        let dx = b.0 - a.0;
+        let dy = b.1 - a.1;
+        let d = f64::sqrt(dx * dx + dy * dy);
+        if (d == 0.) {
+            i += 1;
+            continue;
+        }
+        let n = (d / step).trunc();
+        let rest = (n as f64 * step) / d;
+        let rpx = a.0 * (1. - rest) + b.0 * rest;
+        let rpy = a.1 * (1. - rest) + b.1 * rest;
+        for j in 1..n as i32 {
+            let t = j as f64 / n;
+            let x = a.0 * (1. - t) + rpx * t;
+            let y = a.1 * (1. - t) + rpy * t;
+            // let xy = [x, y];
+            // for k in 2..a.len() {
+            //     xy.push(a[k] * (1 - t) + (a[k] * (1 - rest) + b[k] * rest) * t);
+            // }
+            out.push((x, y));
+        }
+
+        next = None;
+        for j in i + 2..polyline.len() {
+            let b = polyline[j - 1];
+            let c = polyline[j];
+            if (b.0 == c.0 && b.1 == c.1) {
+                continue;
+            }
+            let t_opt: Option<f64> = todo!("isect_circ_line(rpx, rpy, step, b.0, b.1, c.0, c.1)");
+            let Some(t) = t_opt else {
+                continue;
+            };
+
+            let q = (b.0 * (1. - t) + c.0 * t, b.1 * (1. - t) + c.1 * t);
+            // for k in 2..b.len() {
+            //     q.push(b[k] * (1 - t) + c[k] * t);
+            // }
+            out.push(q);
+            polyline[j - 1] = q;
+            next = Some(j - 1);
+            break;
+        }
+        let Some(nxt) = next else {
+            break;
+        };
+        i = nxt;
     }
 
-    next = None;
-    for j in i+2; j < polyline.len() {
-      let b = polyline[j-1];
-      let c = polyline[j];
-      if (b[0] == c[0] && b[1] == c[1]){
-        continue;
-      }
-      let t = isect_circ_line(rpx,rpy,step,b[0],b[1],c[0],c[1]);
-      if (t == None){
-        continue;
-      }
-
-      let q = [
-        b[0]*(1-t)+c[0]*t,
-        b[1]*(1-t)+c[1]*t,
-      ];
-      for k in 2; k < b.len(); k++){
-        q.push(b[k]*(1-t)+c[k]*t);
-      }
-      out.push(q);
-      polyline[j-1] = q;
-      next = j-1;
-      break;
+    if (out.len() > 1) {
+        let lx = out[out.len() - 1].0;
+        let ly = out[out.len() - 1].1;
+        let mx = polyline[polyline.len() - 1].0;
+        let my = polyline[polyline.len() - 1].1;
+        let d = f64::sqrt((mx - lx).powi(2) + (my - ly).powi(2));
+        if (d < step * 0.5) {
+            out.pop();
+        }
     }
-    if (next == None){
-      break;
-    }
-    i = next;
-
-  }
-
-  if (out.len() > 1){
-    let lx = out[out.len()-1][0];
-    let ly = out[out.len()-1][1];
-    let mx = polyline[polyline.len()-1][0];
-    let my = polyline[polyline.len()-1][1];
-    let d = Math.sqrt((mx-lx)**2+(my-ly)**2);
-    if (d < step*0.5){
-      out.pop();
-    }
-  }
-  out.push(polyline[polyline.len()-1].slice());
-  return out;
+    out.push(polyline[polyline.len() - 1]);
+    return out;
 }
 
-
+/*
 pub fn pt_seg_dist(p, p0, p1)  {
   // https://stackoverflow.com/a/6853926
   let x = p[0];   let y = p[1];

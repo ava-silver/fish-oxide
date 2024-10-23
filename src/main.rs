@@ -2,7 +2,7 @@
 use clap::{command, Parser, ValueEnum};
 use core::f64;
 use core::f64::consts::{E, PI};
-use draw::{cleanup, reframe};
+use draw::{cleanup, fish, reframe};
 use geometry::{dist, get_boundingbox, trsl_poly, Polyline};
 use hershey::compile_hershey;
 use params::generate_params;
@@ -65,12 +65,12 @@ fn main() {
         seed_rand(!!(thread_rng().gen::<u64>()));
         "binomen()".to_string()
     });
-    seed_rand(str_to_seed(seed).into());
+    seed_rand(str_to_seed(seed.to_owned()).into());
 
     let format = args.format.unwrap_or(Format::Svg);
     let mut speed = 0.005;
     speed = speed / args.speed.unwrap_or(1.);
-    let drawing = todo!("fish(generate_params())");
+    let drawing = fish(generate_params());
     seed += ".";
     let polylines = cleanup(reframe(drawing, Some(20.), Some((seed))));
 

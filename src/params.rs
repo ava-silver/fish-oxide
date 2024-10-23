@@ -1,70 +1,70 @@
 use crate::custom_rand::{choice, rndtri, rndtri_f};
 
 pub struct Params {
-    body_curve_type: i32,
-    body_curve_amount: f64,
-    body_length: i32,
-    body_height: i32,
-    scale_type: i32,
-    scale_scale: f64,
-    pattern_type: i32,
-    pattern_scale: f64,
-    dorsal_texture_type: i32,
-    dorsal_type: i32,
-    dorsal_length: i32,
-    dorsal_start: i32,
-    dorsal_end: i32,
-    wing_texture_type: i32,
-    wing_type: i32,
-    wing_start: i32,
-    wing_end: i32,
-    wing_y: f64,
-    wing_length: i32,
-    wing_width: i32,
-    pelvic_start: i32,
-    pelvic_end: i32,
-    pelvic_length: i32,
-    pelvic_type: i32,
-    pelvic_texture_type: i32,
-    anal_start: i32,
-    anal_end: i32,
-    anal_length: i32,
-    anal_type: i32,
-    anal_texture_type: i32,
-    tail_type: i32,
-    tail_length: i32,
-    finlet_type: i32,
-    neck_type: i32,
-    nose_height: i32,
-    mouth_size: i32,
-    head_length: i32,
-    head_texture_amount: i32,
-    has_moustache: i32,
-    moustache_length: i32,
-    has_beard: i32,
-    has_teeth: i32,
-    teeth_length: i32,
-    teeth_space: f64,
-    beard_length: i32,
-    eye_type: i32,
-    eye_size: i32,
-    jaw_size: f64,
-    jaw_open: i32,
+    pub body_curve_type: i32,
+    pub body_curve_amount: f64,
+    pub body_length: f64,
+    pub body_height: f64,
+    pub scale_type: i32,
+    pub scale_scale: f64,
+    pub pattern_type: i32,
+    pub pattern_scale: f64,
+    pub dorsal_texture_type: i32,
+    pub dorsal_type: i32,
+    pub dorsal_length: f64,
+    pub dorsal_start: usize,
+    pub dorsal_end: usize,
+    pub wing_texture_type: i32,
+    pub wing_type: i32,
+    pub wing_start: usize,
+    pub wing_end: usize,
+    pub wing_y: f64,
+    pub wing_length: f64,
+    pub wing_width: f64,
+    pub pelvic_start: usize,
+    pub pelvic_end: usize,
+    pub pelvic_length: f64,
+    pub pelvic_type: i32,
+    pub pelvic_texture_type: i32,
+    pub anal_start: usize,
+    pub anal_end: usize,
+    pub anal_length: f64,
+    pub anal_type: i32,
+    pub anal_texture_type: i32,
+    pub tail_type: i32,
+    pub tail_length: i32,
+    pub finlet_type: i32,
+    pub neck_type: i32,
+    pub nose_height: i32,
+    pub mouth_size: i32,
+    pub head_length: i32,
+    pub head_texture_amount: i32,
+    pub has_moustache: i32,
+    pub moustache_length: i32,
+    pub has_beard: i32,
+    pub has_teeth: i32,
+    pub teeth_length: i32,
+    pub teeth_space: f64,
+    pub beard_length: i32,
+    pub eye_type: i32,
+    pub eye_size: i32,
+    pub jaw_size: f64,
+    pub jaw_open: i32,
 }
 impl Params {
     pub fn default() -> Self {
         Params {
             body_curve_type: 0,
             body_curve_amount: 0.85,
-            body_length: 350,
-            body_height: 90,
+            body_length: 350.,
+            body_height: 90.,
             scale_type: 1,
             scale_scale: 1.,
             pattern_type: 3,
             pattern_scale: 1.,
             dorsal_texture_type: 1,
             dorsal_type: 0,
-            dorsal_length: 100,
+            dorsal_length: 100.,
             dorsal_start: 8,
             dorsal_end: 27,
             wing_texture_type: 0,
@@ -72,16 +72,16 @@ impl Params {
             wing_start: 6,
             wing_end: 6,
             wing_y: 0.7,
-            wing_length: 130,
-            wing_width: 10,
+            wing_length: 130.,
+            wing_width: 10.,
             pelvic_start: 9,
             pelvic_end: 14,
-            pelvic_length: 85,
+            pelvic_length: 85.,
             pelvic_type: 0,
             pelvic_texture_type: 0,
             anal_start: 19,
             anal_end: 29,
-            anal_length: 50,
+            anal_length: 50.,
             anal_type: 0,
             anal_texture_type: 0,
             tail_type: 0,
@@ -111,39 +111,39 @@ pub fn generate_params() -> Params {
     let mut arg = Params::default();
     arg.body_curve_type = *choice(&[0, 1], None);
     arg.body_curve_amount = rndtri_f(0.5, 0.85, 0.98);
-    arg.body_length = rndtri(200, 350, 420);
-    arg.body_height = rndtri(45, 90, 150);
+    arg.body_length = rndtri_f(200., 350., 420.);
+    arg.body_height = rndtri_f(45., 90., 150.);
     arg.scale_type = *choice(&[0, 1, 2, 3], None);
     arg.scale_scale = rndtri_f(0.8, 1., 1.5);
     arg.pattern_type = *choice(&[0, 1, 2, 3, 4], None);
     arg.pattern_scale = rndtri_f(0.5, 1., 2.);
     arg.dorsal_texture_type = *choice(&[0, 1], None);
     arg.dorsal_type = *choice(&[0, 1], None);
-    arg.dorsal_length = rndtri(30, 90, 180);
+    arg.dorsal_length = rndtri_f(30., 90., 180.);
     if (arg.dorsal_type == 0) {
-        arg.dorsal_start = !!rndtri(7, 8, 15);
-        arg.dorsal_end = !!rndtri(20, 27, 28);
+        arg.dorsal_start = !!rndtri(7, 8, 15) as usize;
+        arg.dorsal_end = !!rndtri(20, 27, 28) as usize;
     } else {
-        arg.dorsal_start = !!rndtri(11, 12, 16);
-        arg.dorsal_end = !!rndtri(19, 21, 24);
+        arg.dorsal_start = !!rndtri(11, 12, 16) as usize;
+        arg.dorsal_end = !!rndtri(19, 21, 24) as usize;
     }
     arg.wing_texture_type = *choice(&[0, 1], None);
     arg.wing_type = *choice(&[0, 1], None);
     if (arg.wing_type == 0) {
-        arg.wing_length = rndtri(40, 130, 200);
+        arg.wing_length = rndtri_f(40., 130., 200.);
     } else {
-        arg.wing_length = rndtri(40, 150, 350);
+        arg.wing_length = rndtri_f(40., 150., 350.);
     }
     if (arg.wing_texture_type == 0) {
-        arg.wing_width = rndtri(7, 10, 20);
+        arg.wing_width = rndtri_f(7., 10., 20.);
         arg.wing_y = rndtri_f(0.45, 0.7, 0.85);
     } else {
-        arg.wing_width = rndtri(20, 30, 50);
+        arg.wing_width = rndtri_f(20., 30., 50.);
         arg.wing_y = rndtri_f(0.45, 0.65, 0.75);
     }
 
-    arg.wing_start = !!rndtri(5, 6, 8);
-    arg.wing_end = !!rndtri(5, 6, 8);
+    arg.wing_start = !!rndtri(5, 6, 8) as usize;
+    arg.wing_end = !!rndtri(5, 6, 8) as usize;
 
     arg.pelvic_texture_type = if arg.dorsal_texture_type != 0 {
         *choice(&[0, 1], None)
@@ -151,12 +151,12 @@ pub fn generate_params() -> Params {
         0
     };
     arg.pelvic_type = *choice(&[0, 1], None);
-    arg.pelvic_length = rndtri(30, 85, 140);
+    arg.pelvic_length = rndtri_f(30., 85., 140.);
     if (arg.pelvic_type == 0) {
-        arg.pelvic_start = !!rndtri(7, 9, 11);
-        arg.pelvic_end = !!rndtri(13, 14, 15);
+        arg.pelvic_start = !!rndtri(7, 9, 11) as usize;
+        arg.pelvic_end = !!rndtri(13, 14, 15) as usize;
     } else {
-        arg.pelvic_start = !!rndtri(7, 9, 12);
+        arg.pelvic_start = !!rndtri(7, 9, 12) as usize;
         arg.pelvic_end = arg.pelvic_start + 2;
     }
 
@@ -166,9 +166,9 @@ pub fn generate_params() -> Params {
         0
     };
     arg.anal_type = *choice(&[0, 1], None);
-    arg.anal_length = rndtri(20, 50, 80);
-    arg.anal_start = !!rndtri(16, 19, 23);
-    arg.anal_end = !!rndtri(25, 29, 31);
+    arg.anal_length = rndtri_f(20., 50., 80.);
+    arg.anal_start = !!rndtri(16, 19, 23) as usize;
+    arg.anal_end = !!rndtri(25, 29, 31) as usize;
 
     arg.tail_type = *choice(&[0, 1, 2, 3, 4, 5], None);
     arg.tail_length = rndtri(50, 75, 180);

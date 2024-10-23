@@ -1,6 +1,12 @@
+use std::f64::consts::PI;
+
 use crate::{
-    geometry::{dist, get_boundingbox, trsl_poly, Polyline},
+    custom_rand::{deviate, noise},
+    geometry::{
+        clip_multi, dist, get_boundingbox, lerp, lerp2d, poly_union, resample, trsl_poly, Polyline,
+    },
     hershey::compile_hershey,
+    params::Params,
 };
 
 /*
@@ -172,7 +178,7 @@ pub fn fish_body_b(curve0,curve1,scale_scale,pattern_func){
 
 
 pub fn ogee(x){
-  return 4 * Math.pow(x-0.5,3) + 0.5;
+  return 4 * f64::powf(x-0.5,3) + 0.5;
 }
 
 pub fn fish_body_c(curve0,curve1,scale_scale){
@@ -314,16 +320,16 @@ pub fn fin_a(curve,ang0,ang1,func,clip_root=false,curvature0=0,curvature1=0,soft
 
     let [x0,y0] = curve[i];
     let x1 = x0 + Math.cos(a)*w;
-    let y1 = y0 + Math.sin(a)*w;
+    let y1 = y0 + f64::sin(a)*w;
 
     let p = resample([[x0,y0],[x1,y1]],3);
     for j in 0..p.len(); j++){
       let s = j/(p.len()-1);
       let ss = Math.sqrt(s);
       let [x,y] = p[j];
-      let cv = lerp(curvature0,curvature1,t)*Math.sin(s*PI);
+      let cv = lerp(curvature0,curvature1,t)*f64::sin(s*PI);
       p[j][0] += noise(x*0.1,y*0.1,3)*ss*softness + Math.cos(a-PI/2)*cv;
-      p[j][1] += noise(x*0.1,y*0.1,4)*ss*softness + Math.sin(a-PI/2)*cv;
+      p[j][1] += noise(x*0.1,y*0.1,4)*ss*softness + f64::sin(a-PI/2)*cv;
     }
     if (i == 0){
       out2 = p;
@@ -383,24 +389,24 @@ pub fn fin_b(curve,ang0,ang1,func,dark=1){
 
     let [x0,y0] = curve[i];
     let x1 = x0 + Math.cos(a)*w;
-    let y1 = y0 + Math.sin(a)*w;
+    let y1 = y0 + f64::sin(a)*w;
 
     let b = [
       x1 + 0.5 * Math.cos(a-PI/2),
-      y1 + 0.5 * Math.sin(a-PI/2),
+      y1 + 0.5 * f64::sin(a-PI/2),
     ];
     let c = [
       x1 + 0.5 * Math.cos(a+PI/2),
-      y1 + 0.5 * Math.sin(a+PI/2),
+      y1 + 0.5 * f64::sin(a+PI/2),
     ];
 
     let p = [
       curve[i][0] + 1.8 * Math.cos(a-PI/2),
-      curve[i][1] + 1.8 * Math.sin(a-PI/2),
+      curve[i][1] + 1.8 * f64::sin(a-PI/2),
     ];
     let q = [
       curve[i][0] + 1.8 * Math.cos(a+PI/2),
-      curve[i][1] + 1.8 * Math.sin(a+PI/2),
+      curve[i][1] + 1.8 * f64::sin(a+PI/2),
     ];
     out1.push([x1,y1]);
     out0.push([p,b,c,q]);
@@ -420,11 +426,11 @@ pub fn fin_b(curve,ang0,ang1,func,dark=1){
 
     for j in 0..n; j++){
       let t = j/(n-1);
-      let d = Math.sin(t*PI)*2;
+      let d = f64::sin(t*PI)*2;
       let a = lerp2d(...b,...c,t);
       o.push([
         a[0] + Math.cos(ang+PI/2)*d,
-        a[1] + Math.sin(ang+PI/2)*d,
+        a[1] + f64::sin(ang+PI/2)*d,
       ])
     }
 
@@ -488,7 +494,7 @@ pub fn finlet(curve,h,dir=1){
 
     let [x0,y0] = curve[i];
     let x1 = x0 + Math.cos(a)*w;
-    let y1 = y0 + Math.sin(a)*w;
+    let y1 = y0 + f64::sin(a)*w;
     out0.push([x1,y1]);
 
   }
@@ -524,7 +530,7 @@ pub fn fin_adipose(curve,dx,dy,r){
     let a = lerp(a01,a02,t);
     let p = [
       x+Math.cos(a)*r,
-      y+Math.sin(a)*r,
+      y+f64::sin(a)*r,
     ]
     out0.push(p);
   }
@@ -532,7 +538,7 @@ pub fn fin_adipose(curve,dx,dy,r){
   out0 = resample(out0,3);
   for i in 0..out0.len() {
     let t = i/(out0.len()-1);
-    let s = Math.sin(t*PI);
+    let s = f64::sin(t*PI);
     let [x,y] = out0[i];
     out0[i][0] += (noise(x*0.01,y*0.01)-0.5)*s*50;
     out0[i][1] += (noise(x*0.01,y*0.01)-0.5)*s*50;
@@ -540,7 +546,7 @@ pub fn fin_adipose(curve,dx,dy,r){
   let cc = out0.concat(curve.slice().reverse());
   let out1 = clip(trsl_poly(out0,0,4),cc).clip;
 
-  out1 = clip_multi(out1,(x,y,t)=>(rand()<Math.sin(t*PI)),binclip).clip;
+  out1 = clip_multi(out1,(x,y,t)=>(rand()<f64::sin(t*PI)),binclip).clip;
   return [cc,[out0,...out1]];
 
 }
@@ -556,13 +562,13 @@ pub fn fish_lip(x0,y0,x1,y1,w){
   let n = 10;
   let ang = Math.acos(w/h);
   let dx = Math.cos(a0+PI/2)*0.5;
-  let dy = Math.sin(a0+PI/2)*0.5;
+  let dy = f64::sin(a0+PI/2)*0.5;
   let o = [[x0-dx,y0-dy]];
   for i in 0..n {
     let t = i/(n-1);
     let a = lerp(ang,PI*2-ang,t) + a0;
     let x = -Math.cos(a)*w + x1;
-    let y = -Math.sin(a)*w + y1;
+    let y = -f64::sin(a)*w + y1;
     o.push([x,y]);
   }
   o.push([x0+dx,y0+dy]);
@@ -585,21 +591,21 @@ pub fn fish_teeth(x0,y0,x1,y1,h,dir,sep=3.5){
     let w = h*t;
     let b = [
       a[0]+Math.cos(ang+dir*PI/2)*w,
-      a[1]+Math.sin(ang+dir*PI/2)*w,
+      a[1]+f64::sin(ang+dir*PI/2)*w,
     ];
     let c = [
       a[0] + 1 * Math.cos(ang),
-      a[1] + 1 * Math.sin(ang),
+      a[1] + 1 * f64::sin(ang),
     ];
     let d = [
       a[0] + 1 * Math.cos(ang+PI),
-      a[1] + 1 * Math.sin(ang+PI),
+      a[1] + 1 * f64::sin(ang+PI),
     ];
     let e = lerp2d(...c,...b,0.7);
     let f = lerp2d(...d,...b,0.7);
     let g = [
       a[0]+Math.cos(ang+dir*(PI/2+0.15))*w,
-      a[1]+Math.sin(ang+dir*(PI/2+0.15))*w,
+      a[1]+f64::sin(ang+dir*(PI/2+0.15))*w,
     ]
     out.push([c,e,g,f,d])
     // out.push(barbel(...a,10,ang+dir*PI/2))
@@ -614,12 +620,12 @@ pub fn fish_jaw(x0,y0,x1,y1,x2,y2){
   let o = [];
   for i in 0..n {
     let t = i/(n-1);
-    let s = Math.sin(t*PI);
+    let s = f64::sin(t*PI);
     let w = s*d/20;
     let p = lerp2d(x2,y2,x0,y0,t);
     let q = [
       p[0] + Math.cos(ang-PI/2)*w,
-      p[1] + Math.sin(ang-PI/2)*w,
+      p[1] + f64::sin(ang-PI/2)*w,
     ]
     let qq = [
       q[0] + (noise(q[0]*0.01,q[1]*0.01,1)-0.5)*4*s,
@@ -641,17 +647,17 @@ pub fn fish_eye_a(ex,ey,rad){
     let a = t * PI*2 + Math.PI/4*3;
     eye0.push([
       ex + Math.cos(a)*rad,
-      ey + Math.sin(a)*rad
+      ey + f64::sin(a)*rad
     ]);
     if (t > 0.5){
       eye1.push([
         ex + Math.cos(a)*(rad*0.8),
-        ey + Math.sin(a)*(rad*0.8)
+        ey + f64::sin(a)*(rad*0.8)
       ]);
     }
     eye2.push([
       ex + Math.cos(a)*(rad*0.4) -0.75,
-      ey + Math.sin(a)*(rad*0.4) -0.75
+      ey + f64::sin(a)*(rad*0.4) -0.75
     ]);
   }
 
@@ -669,11 +675,11 @@ pub fn fish_eye_b(ex,ey,rad){
     let a = t * PI*2+E;
     eye0.push([
       ex + Math.cos(a)*rad,
-      ey + Math.sin(a)*rad
+      ey + f64::sin(a)*rad
     ]);
     eye2.push([
       ex + Math.cos(a)*(rad*0.4),
-      ey + Math.sin(a)*(rad*0.4)
+      ey + f64::sin(a)*(rad*0.4)
     ]);
   }
   let m =!!((rad*0.6)/2);
@@ -685,16 +691,16 @@ pub fn fish_eye_b(ex,ey,rad){
       let a = lerp(PI*7/8,PI*13/8,t)
       e.push([
         ex + Math.cos(a)*r,
-        ey + Math.sin(a)*r
+        ey + f64::sin(a)*r
       ]);
 
     }
     eye1.push(e);
   }
   let trig = [
-    [ex+Math.cos(-PI*3/4)*(rad*0.9),ey+Math.sin(-PI*3/4)*(rad*0.9)],
+    [ex+Math.cos(-PI*3/4)*(rad*0.9),ey+f64::sin(-PI*3/4)*(rad*0.9)],
     [ex+1,ey+1],
-    [ex+Math.cos(-PI*11/12)*(rad*0.9),ey+Math.sin(-PI*11/12)*(rad*0.9)],
+    [ex+Math.cos(-PI*11/12)*(rad*0.9),ey+f64::sin(-PI*11/12)*(rad*0.9)],
   ];
   trig = resample(trig,3);
   for i in 0..trig.len() {
@@ -722,7 +728,7 @@ pub fn barbel(x,y,n,ang,dd=3){
   let ar = 1;
   for i in 0..n {
     x += Math.cos(ang)*dd;
-    y += Math.sin(ang)*dd;
+    y += f64::sin(ang)*dd;
     ang += (noise(i*0.1,sd)-0.5)*ar;
     if (i < n/2){
       ar *= 1.02;
@@ -758,11 +764,11 @@ pub fn barbel(x,y,n,ang,dd=3){
 
     o0.push([
       b[0]+Math.cos(a2)*w,
-      b[1]+Math.sin(a2)*w
+      b[1]+f64::sin(a2)*w
     ])
     o1.push([
       b[0]+Math.cos(a2+PI)*w,
-      b[1]+Math.sin(a2+PI)*w
+      b[1]+f64::sin(a2+PI)*w
     ])
   }
   o0.push(curve[curve.len()-1]);
@@ -778,7 +784,7 @@ pub fn fish_head(x0,y0,x1,y1,x2,y2,arg){
     let t = i/(n-1);
     let a = PI/2 * t;
     let x = x1-pow(Math.cos(a),1.5)*(x1-x0);
-    let y = y0-pow(Math.sin(a),1.5)*(y0-y1);
+    let y = y0-pow(f64::sin(a),1.5)*(y0-y1);
     // let x = lerp(x0,x1,t);
     // let y = lerp(y0,y1,t);
 
@@ -790,7 +796,7 @@ pub fn fish_head(x0,y0,x1,y1,x2,y2,arg){
     let t = i/(n-1);
     let a = PI/2 * t;
     let x = x2-pow(Math.cos(a),0.8)*(x2-x0);
-    let y = y0+pow(Math.sin(a),1.5)*(y2-y0);
+    let y = y0+pow(f64::sin(a),1.5)*(y2-y0);
 
     let dx = (noise(x*0.01,y*0.01,9)*40-20)*(1.01-t);
     let dy = (noise(x*0.01,y*0.01,8)*40-20)*(1.01-t);
@@ -800,11 +806,11 @@ pub fn fish_head(x0,y0,x1,y1,x2,y2,arg){
   for i in 1; i < n-1 {
     let t = i/(n-1);
     let p = lerp2d(x1,y1,x2,y2,t);
-    let s = pow(Math.sin(t*Math.PI),0.5);
+    let s = pow(f64::sin(t*Math.PI),0.5);
     let r = noise(t*2,1.2) * s * 20;
 
     let dx = Math.cos(ang-Math.PI/2) * r;
-    let dy = Math.sin(ang-Math.PI/2) * r;
+    let dy = f64::sin(ang-Math.PI/2) * r;
     curve2.push([ p[0]+dx,p[1]+dy ])
   }
   let outline = curve0.concat(curve2).concat(curve1);
@@ -812,7 +818,7 @@ pub fn fish_head(x0,y0,x1,y1,x2,y2,arg){
   let inline = curve2.slice(!!(curve2.len()/3)).concat(curve1.slice(0,!!(curve1.len()/2))).slice(0,curve0.len());
   for i in 0..inline.len() {
     let t = i/(inline.len()-1);
-    let s = Math.sin(t*PI)**2*0.1+0.12;
+    let s = f64::sin(t*PI)**2*0.1+0.12;
     inline[i] = lerp2d(...inline[i],...curve0[i],s);
   }
   let dix = (x0-inline[inline.len()-1][0])*0.3;
@@ -833,7 +839,7 @@ pub fn fish_head(x0,y0,x1,y1,x2,y2,arg){
   }else if (d0 < arg.eye_size){
     let ang = Math.atan2(y1-y0,x1-x0)+PI/2;
     ex = x0*0.5+x1*0.5 + Math.cos(ang)*arg.eye_size;
-    ey = y0*0.5+y1*0.5 + Math.sin(ang)*arg.eye_size;
+    ey = y0*0.5+y1*0.5 + f64::sin(ang)*arg.eye_size;
   }
 
   let jaw_pt0 = curve1[18-arg.mouth_size];
@@ -842,7 +848,7 @@ pub fn fish_head(x0,y0,x1,y1,x2,y2,arg){
   let jaw_ang =jaw_ang0- (arg.has_teeth*0.5+0.5)*arg.jaw_open*PI/4;
   let jaw_pt1 = [
     jaw_pt0[0]+Math.cos(jaw_ang)*jaw_l,
-    jaw_pt0[1]+Math.sin(jaw_ang)*jaw_l,
+    jaw_pt0[1]+f64::sin(jaw_ang)*jaw_l,
   ]
 
   let [eye0,ef] = (arg.eye_type?fish_eye_b:fish_eye_a)(ex,ey,arg.eye_size);
@@ -926,287 +932,354 @@ pub fn fish_head(x0,y0,x1,y1,x2,y2,arg){
     ...jaw]];
 }
 
-pub fn bean(x){
-  return Math.pow(0.25-Math.pow(x-0.5,2),0.5)*(2.6+2.4*Math.pow(x,1.5))*0.542;
-}
-
-
-pub fn fish(arg){
-  let n = 32;
-  let curve0 = [];
-  let curve1 = [];
-  if (arg.body_curve_type == 0){
-    let s = arg.body_curve_amount;
-    for i in 0..n {
-      let t = i/(n-1);
-
-      let x =  225 + (t-0.5)*arg.body_length;
-      let y = 150 - (Math.sin(t*PI)*lerp(0.5,1,noise(t*2,1))*s+(1-s))*arg.body_height;
-      curve0.push([x,y]);
-    }
-    for i in 0..n {
-      let t = i/(n-1);
-      let x =  225 + (t-0.5)*arg.body_length;
-      let y = 150 + (Math.sin(t*PI)*lerp(0.5,1,noise(t*2,2))*s+(1-s))*arg.body_height;
-      curve1.push([x,y]);
-    }
-  }else if (arg.body_curve_type == 1){
-    for i in 0..n {
-      let t = i/(n-1);
-
-      let x = 225 + (t-0.5)*arg.body_length;
-      let y = 150-lerp(1-arg.body_curve_amount,1,lerp(0,1,noise(t*1.2,1))*bean(1-t))*arg.body_height;
-      curve0.push([x,y]);
-    }
-    for i in 0..n {
-      let t = i/(n-1);
-      let x = 225 + (t-0.5)*arg.body_length;
-      let y = 150+lerp(1-arg.body_curve_amount,1,lerp(0,1,noise(t*1.2,2))*bean(1-t))*arg.body_height;
-      curve1.push([x,y]);
-    }
-  }
-  let outline = curve0.concat(curve1.slice().reverse());
-  let sh = shade_shape(outline,8,-12,-12);
-
-  let pattern_func;
-  if (arg.pattern_type == 0){
-    //none
-    pattern_func = None;
-  }else if (arg.pattern_type == 1){
-    // pattern_func = (x,y)=>{
-    //   return noise(x*0.1,y*0.1)>0.55;
-    // };
-    pattern_func = pattern_dot(arg.pattern_scale);
-  }else if (arg.pattern_type == 2){
-    pattern_func = (x,y)=>{
-      return (noise(x*0.1,y*0.1) * Math.max(0.35,(y-10)/280) ) < 0.2 ;
-    };
-  }else if (arg.pattern_type == 3){
-    pattern_func = (x,y)=>{
-      let dx = noise(x*0.01,y*0.01)*30;
-      return (!!((x+dx)/(30*arg.pattern_scale)))%2 == 1;
-    };
-  }else if (arg.pattern_type == 4){
-    //small dot;
-    pattern_func = None;
-  }
-
-  let bd;
-  if (arg.scale_type == 0){
-    bd = fish_body_a(curve0,curve1,arg.scale_scale,pattern_func);
-  }else if (arg.scale_type == 1){
-    bd = fish_body_b(curve0,curve1,arg.scale_scale,pattern_func);
-  }else if (arg.scale_type == 2){
-    bd = fish_body_c(curve0,curve1,arg.scale_scale);
-  }else if (arg.scale_type == 3){
-    bd = fish_body_d(curve0,curve1,arg.scale_scale);
-  }
-
-  let f0_func, f0_a0, f0_a1, f0_cv;
-  if (arg.dorsal_type == 0){
-    f0_a0 = 0.2 + deviate(0.05);
-    f0_a1 = 0.3 + deviate(0.05);
-    f0_cv = 0;
-    f0_func = t=>(  (0.3+noise(t*3)*0.7)*arg.dorsal_length *Math.sin(t*PI)**0.5  );
-  }else if (arg.dorsal_type == 1){
-    f0_a0 = 0.6 + deviate(0.05);
-    f0_a1 = 0.3 + deviate(0.05);
-    f0_cv = arg.dorsal_length/8;
-    f0_func = t=>(  arg.dorsal_length* ((Math.pow(t-1,2))*0.5 + (1-t)*0.5)  );
-  }
-  let f0_curve,c0,f0;
-  if (arg.dorsal_texture_type == 0){
-    f0_curve = resample(curve0.slice(arg.dorsal_start,arg.dorsal_end),5);
-    ;[c0,f0] = fin_a(f0_curve,f0_a0,f0_a1,f0_func,false,f0_cv,0);
-  }else{
-    f0_curve = resample(curve0.slice(arg.dorsal_start,arg.dorsal_end),15);
-    ;[c0,f0] = fin_b(f0_curve,f0_a0,f0_a1,f0_func);
-  }
-  f0 = clip_multi(f0,trsl_poly(outline,0,0.001)).dont_clip;
-
-  let f1_curve = [];
-  let f1_func, f1_a0, f1_a1, f1_soft, f1_cv;
-  let f1_pt = lerp2d(...curve0[arg.wing_start],...curve1[arg.wing_end],arg.wing_y);
-
-  for i in 0..10 {
-    let t = i/9;
-    let y = lerp(f1_pt[1]-arg.wing_width/2,f1_pt[1]+arg.wing_width/2,t);
-    f1_curve.push([f1_pt[0] /*+ Math.sin(t*PI)*2*/,y]);
-  }
-  if (arg.wing_type == 0){
-    f1_a0 = -0.4 + deviate(0.05);
-    f1_a1 = 0.4 + deviate(0.05);
-    f1_soft = 10;
-    f1_cv = 0;
-    f1_func = t=>(  (40+(20+noise(t*3)*70)*Math.sin(t*PI)**0.5)/130*arg.wing_length  );
-  }else{
-    f1_a0 = 0 + deviate(0.05);
-    f1_a1 = 0.4 + deviate(0.05);
-    f1_soft = 5;
-    f1_cv = arg.wing_length/25;
-    f1_func = t=>(  arg.wing_length*(1-t*0.95)  );
-  }
-
-  let c1,f1;
-  if (arg.wing_texture_type == 0){
-    f1_curve = resample(f1_curve,1.5);
-    ;[c1,f1] = fin_a(f1_curve,f1_a0,f1_a1,f1_func,1,f1_cv,0,f1_soft);
-  }else{
-    f1_curve = resample(f1_curve,4);
-    ;[c1,f1] = fin_b(f1_curve,f1_a0,f1_a1,f1_func,0.3);
-  }
-  bd = clip_multi(bd,c1).dont_clip;
-
-
-  let f2_curve;
-  let f2_func, f2_a0, f2_a1;
-  if (arg.pelvic_type == 0){
-    f2_a0 = -0.8 + deviate(0.05);;
-    f2_a1 = -0.5 + deviate(0.05);;
-    f2_func = t=>(  (10+(15+noise(t*3)*60)*Math.sin(t*PI)**0.5)/85*arg.pelvic_length  );
-  }else{
-    f2_a0 = -0.9 + deviate(0.05);;
-    f2_a1 = -0.3 + deviate(0.05);;
-    f2_func = t=>( (t*0.5+0.5)*arg.pelvic_length  );
-  }
-  let c2,f2;
-  if (arg.pelvic_texture_type == 0){
-    f2_curve = resample(curve1.slice(arg.pelvic_start,arg.pelvic_end).reverse(),arg.pelvic_type?2:5);
-    ;[c2,f2] = fin_a(f2_curve,f2_a0,f2_a1,f2_func);
-  }else{
-    f2_curve = resample(curve1.slice(arg.pelvic_start,arg.pelvic_end).reverse(),arg.pelvic_type?2:15);
-    ;[c2,f2] = fin_b(f2_curve,f2_a0,f2_a1,f2_func);
-  }
-  f2 = clip_multi(f2,c1).dont_clip;
-
-  let f3_curve;
-  let f3_func, f3_a0, f3_a1;
-  if (arg.anal_type == 0){
-    f3_a0 = -0.4 + deviate(0.05);;
-    f3_a1 = -0.4 + deviate(0.05);;
-    f3_func = t=>(  (10+(10+noise(t*3)*30)*Math.sin(t*PI)**0.5)/50*arg.anal_length  );
-  }else{
-    f3_a0 = -0.4 + deviate(0.05);;
-    f3_a1 = -0.4 + deviate(0.05);;
-    f3_func = t=>(  arg.anal_length* (t*t*0.8+0.2)  );
-  }
-  let c3,f3;
-  if (arg.anal_texture_type == 0){
-    f3_curve = resample(curve1.slice(arg.anal_start,arg.anal_end).reverse(),5);
-    ;[c3,f3] = fin_a(f3_curve,f3_a0,f3_a1,f3_func);
-  }else{
-    f3_curve = resample(curve1.slice(arg.anal_start,arg.anal_end).reverse(),15);
-    ;[c3,f3] = fin_b(f3_curve,f3_a0,f3_a1,f3_func);
-  }
-  f3 = clip_multi(f3,c1).dont_clip;
-
-  let f4_curve, c4, f4;
-  let f4_r = dist(...curve0[curve0.len()-2],...curve1[curve1.len()-2]);
-  let f4_n = !!(f4_r/1.5);
-  f4_n = Math.max(Math.min(f4_n,20),8);
-  let f4_d = f4_r/f4_n;
-  // console.log(f4_n,f4_d);
-  if (arg.tail_type == 0){
-    f4_curve = [curve0[curve0.len()-1], curve1[curve1.len()-1]];
-    f4_curve = resample(f4_curve,f4_d);
-    ;[c4,f4] = fin_a(f4_curve,-0.6,0.6,t=>(  (75-(10+noise(t*3)*10)*Math.sin(3*t*PI-PI))/75*arg.tail_length  ),1);
-  }else if (arg.tail_type == 1){
-    f4_curve = [curve0[curve0.len()-2], curve1[curve1.len()-2]];
-    f4_curve = resample(f4_curve,f4_d);
-    ;[c4,f4] = fin_a(f4_curve,-0.6,0.6,t=>( arg.tail_length*(Math.sin(t*PI)*0.5+0.5)  ),1);
-  }else if (arg.tail_type == 2){
-    f4_curve = [curve0[curve0.len()-1], curve1[curve1.len()-1]];
-    f4_curve = resample(f4_curve,f4_d*0.7);
-    let cv = arg.tail_length/8;
-    ;[c4,f4] = fin_a(f4_curve,-0.6,0.6,t=>(  (Math.abs(Math.cos(PI*t))*0.8+0.2)*arg.tail_length  ),1,cv,-cv);
-  }else if (arg.tail_type == 3){
-    f4_curve = [curve0[curve0.len()-2], curve1[curve1.len()-2]];
-    f4_curve = resample(f4_curve,f4_d);
-    ;[c4,f4] = fin_a(f4_curve,-0.6,0.6,t=>(  (1-Math.sin(t*PI)*0.3)*arg.tail_length  ),1);
-  }else if (arg.tail_type == 4){
-    f4_curve = [curve0[curve0.len()-2], curve1[curve1.len()-2]];
-    f4_curve = resample(f4_curve,f4_d);
-    ;[c4,f4] = fin_a(f4_curve,-0.6,0.6,t=>(  (1-Math.sin(t*PI)*0.6)*(1-t*0.45)*arg.tail_length  ),1);
-  }else if (arg.tail_type == 5){
-    f4_curve = [curve0[curve0.len()-2], curve1[curve1.len()-2]];
-    f4_curve = resample(f4_curve,f4_d);
-    ;[c4,f4] = fin_a(f4_curve,-0.6,0.6,t=>(  (1-Math.sin(t*PI)**0.4*0.55)*arg.tail_length  ),1);
-  }
-  // f4 = clip_multi(f4,trsl_poly(outline,-1,0)).dont_clip;
-  bd = clip_multi(bd,trsl_poly(c4,1,0)).dont_clip;
-
-  f4 = clip_multi(f4,c1).dont_clip;
-
-  let f5_curve,c5,f5=[];
-  if (arg.finlet_type == 0){
-    //pass
-  }else if (arg.finlet_type == 1){
-    f5_curve = resample(curve0.slice(arg.dorsal_end,-2),5);
-    ;[c5,f5] = finlet(f5_curve,5);
-    f5_curve = resample(curve1.slice(arg.anal_end,-2).reverse(),5);
-    if (f5_curve.len()>1){
-      ;[c5,f5] = finlet(f5_curve,5);
-    }
-  }else if (arg.finlet_type == 2){
-    f5_curve = resample(curve0.slice(27,30),5);
-    ;[c5,f5] = fin_adipose(f5_curve,20,-5,6);
-    outline = poly_union(outline,trsl_poly(c5,0,-1));
-  }else{
-    f5_curve = resample(curve0.slice(arg.dorsal_end+2,-3),5);
-    if (f5_curve.len()>2){
-      ;[c5,f5] = fin_a(f5_curve,0.2,0.3, t=>(  (0.3+noise(t*3)*0.7)*arg.dorsal_length*0.6 *Math.sin(t*PI)**0.5  ));
-    }
-
-  }
-  let cf,fh;
-  if (arg.neck_type == 0){
-    ;[cf,fh] = fish_head(50-arg.head_length,150+arg.nose_height,...curve0[6],...curve1[5],arg);
-  }else{
-    ;[cf,fh] = fish_head(50-arg.head_length,150+arg.nose_height,...curve0[5],...curve1[6],arg);
-  }
-  bd = clip_multi(bd,cf).dont_clip;
-
-  sh = clip_multi(sh,cf).dont_clip;
-  sh = clip_multi(sh,c1).dont_clip;
-
-  f1 = clip_multi(f1,cf).dont_clip;
-
-  f0 = clip_multi(f0,c1).dont_clip;
-
-  let sh2 = [];
-  if (pattern_func){
-    if (arg.scale_type > 1){
-      sh2 = patternshade_shape( poly_union(outline,trsl_poly(c0,0,3)  ),3.5,pattern_func);
-    }else{
-      sh2 = patternshade_shape( c0,4.5,pattern_func);
-    }
-    sh2 = clip_multi(sh2,cf).dont_clip;
-    sh2 = clip_multi(sh2,c1).dont_clip;
-  }
-
-  let sh3 = [];
-  if (arg.pattern_type == 4){
-    sh3 = smalldot_shape( poly_union(outline,trsl_poly(c0,0,5)  ), arg.pattern_scale);
-    sh3 = clip_multi(sh3,c1).dont_clip;
-    sh3 = clip_multi(sh3,cf).dont_clip;
-  }
-
-  return bd.
-  concat(f0).
-  concat(f1).
-  concat(f2).
-  concat(f3).
-  concat(f4).
-  concat(f5).
-  concat(fh).
-  concat(sh).
-  concat(sh2).
-  concat(sh3).
-  // concat([cf]).
-  concat();
-}
-
 */
+pub fn bean(x: f64) -> f64 {
+    f64::powf(0.25 - f64::powf(x - 0.5, 2.), 0.5) * (2.6 + 2.4 * f64::powf(x, 1.5)) * 0.542
+}
+
+fn rev_slice<T: Copy>(v: &Vec<T>, start: usize, end: usize) -> Vec<T> {
+    let mut out = vec![];
+    for i in (start..end).rev() {
+        out.push(v[i]);
+    }
+    out
+}
+
+pub fn fish(arg: Params) -> Vec<Polyline> {
+    let n = 32;
+    let mut curve0 = vec![];
+    let mut curve1 = vec![];
+    if (arg.body_curve_type == 0) {
+        let s = arg.body_curve_amount;
+        for i in 0..n {
+            let t = i as f64 / ((n as f64) - 1.);
+
+            let x = 225. + (t - 0.5) * arg.body_length;
+            let y = 150.
+                - ((t * PI).sin() * lerp(0.5, 1., noise(t * 2., Some(1.), None)) * s + (1. - s))
+                    * arg.body_height as f64;
+            curve0.push((x, y));
+        }
+        for i in 0..n {
+            let t = i as f64 / ((n as f64) - 1.);
+            let x = 225. + (t - 0.5) * arg.body_length;
+            let y = 150.
+                + ((t * PI).sin() * lerp(0.5, 1., noise(t * 2., Some(2.), None)) * s + (1. - s))
+                    * arg.body_height;
+            curve1.push((x, y));
+        }
+    } else if (arg.body_curve_type == 1) {
+        for i in 0..n {
+            let t = i as f64 / ((n as f64) - 1.);
+
+            let x = 225. + (t - 0.5) * arg.body_length;
+            let y = 150.
+                - lerp(
+                    1. - arg.body_curve_amount,
+                    1.,
+                    lerp(0., 1., noise(t * 1.2, Some(1.), None)) * bean(1. - t),
+                ) * arg.body_height;
+            curve0.push((x, y));
+        }
+        for i in 0..n {
+            let t = i as f64 / ((n as f64) - 1.);
+            let x = 225. + (t - 0.5) * arg.body_length;
+            let y = 150.
+                + lerp(
+                    1. - arg.body_curve_amount,
+                    1.,
+                    lerp(0., 1., noise(t * 1.2, Some(2.), None)) * bean(1. - t),
+                ) * arg.body_height;
+            curve1.push((x, y));
+        }
+    }
+    let mut outline = curve0.clone();
+    outline.extend(curve1.clone().into_iter().rev());
+    let sh = todo!("shade_shape(outline,8,-12,-12)");
+
+    let mut pattern_func: Option<Box<dyn Fn(f64, f64) -> bool>> = None;
+    if (arg.pattern_type == 0) {
+        //none
+    } else if (arg.pattern_type == 1) {
+        // pattern_func = (x,y)=>{
+        //   return noise(x*0.1,y*0.1)>0.55;
+        // };
+        pattern_func = Some(todo!("pattern_dot(arg.pattern_scale)"));
+    } else if (arg.pattern_type == 2) {
+        pattern_func = Some(Box::new(|x, y| {
+            (noise(x * 0.1, Some(y * 0.1), None) * f64::max(0.35, (y - 10.) / 280.)) < 0.2
+        }));
+    } else if (arg.pattern_type == 3) {
+        pattern_func = Some(Box::new(|x, y| {
+            let dx = noise(x * 0.01, Some(y * 0.01), None) * 30.;
+            ((x + dx) / (30. * arg.pattern_scale)).trunc() as i64 % 2 == 1
+        }));
+    } else if (arg.pattern_type == 4) {
+        //small dot;
+    }
+
+    let bd;
+    if (arg.scale_type == 0) {
+        bd = todo!("fish_body_a(curve0,curve1,arg.scale_scale,pattern_func)");
+    } else if (arg.scale_type == 1) {
+        bd = todo!("fish_body_b(curve0,curve1,arg.scale_scale,pattern_func)");
+    } else if (arg.scale_type == 2) {
+        bd = todo!("fish_body_c(curve0,curve1,arg.scale_scale)");
+    } else if (arg.scale_type == 3) {
+        bd = todo!("fish_body_d(curve0,curve1,arg.scale_scale)");
+    }
+
+    let mut f0_func: Box<dyn Fn(f64) -> f64>;
+    let mut f0_a0;
+    let mut f0_a1;
+    let mut f0_cv;
+    if (arg.dorsal_type == 0) {
+        f0_a0 = 0.2 + deviate(0.05);
+        f0_a1 = 0.3 + deviate(0.05);
+        f0_cv = 0.;
+        f0_func = Box::new(|t| {
+            (0.3 + noise(t * 3., None, None) * 0.7) * arg.dorsal_length * f64::sin(t * PI).powf(0.5)
+        });
+    } else if (arg.dorsal_type == 1) {
+        f0_a0 = 0.6 + deviate(0.05);
+        f0_a1 = 0.3 + deviate(0.05);
+        f0_cv = arg.dorsal_length / 8.;
+        f0_func = Box::new(|t| arg.dorsal_length * ((f64::powi(t - 1., 2)) * 0.5 + (1. - t) * 0.5));
+    }
+    let mut f0_curve;
+    let mut c0: Vec<Polyline>;
+    let mut f0: Vec<Polyline>;
+    if (arg.dorsal_texture_type == 0) {
+        f0_curve = resample(&curve0[arg.dorsal_start..arg.dorsal_end], 5.);
+        todo!("let (c0, f0) = fin_a(f0_curve,f0_a0,f0_a1,f0_func,false,f0_cv,0)");
+    } else {
+        f0_curve = resample(&curve0[arg.dorsal_start..arg.dorsal_end], 15.);
+        todo!("let (c0, f0) = fin_b(f0_curve,f0_a0,f0_a1,f0_func)");
+    }
+    f0 = clip_multi(&f0, &trsl_poly(&outline, 0., 0.001), None).dont_clip;
+
+    let mut f1_curve = vec![];
+    let mut f1_func: Box<dyn Fn(f64) -> f64>;
+    let mut f1_a0;
+    let mut f1_a1;
+    let mut f1_soft;
+    let mut f1_cv;
+    let f1_pt = lerp2d(curve0[arg.wing_start], curve1[arg.wing_end], arg.wing_y);
+
+    for i in 0..10 {
+        let t = i as f64 / 9.;
+        let y = lerp(
+            f1_pt.1 - arg.wing_width / 2.,
+            f1_pt.1 + arg.wing_width / 2.,
+            t,
+        );
+        f1_curve.push((f1_pt.0 /*+ f64::sin(t*PI)*2*/, y));
+    }
+    if (arg.wing_type == 0) {
+        f1_a0 = -0.4 + deviate(0.05);
+        f1_a1 = 0.4 + deviate(0.05);
+        f1_soft = 10;
+        f1_cv = 0.;
+        f1_func = Box::new(|t| {
+            ((40. + (20. + noise(t * 3., None, None) * 70.) * f64::sin(t * PI).powf(0.5)) / 130.
+                * arg.wing_length)
+        });
+    } else {
+        f1_a0 = 0. + deviate(0.05);
+        f1_a1 = 0.4 + deviate(0.05);
+        f1_soft = 5;
+        f1_cv = arg.wing_length / 25.;
+        f1_func = Box::new(|t| (arg.wing_length * (1. - t * 0.95)));
+    }
+
+    let c1;
+    let f1;
+    if (arg.wing_texture_type == 0) {
+        f1_curve = resample(&f1_curve, 1.5);
+        todo!("let (c1, f1) = fin_a(f1_curve,f1_a0,f1_a1,f1_func,1,f1_cv,0,f1_soft)");
+    } else {
+        f1_curve = resample(&f1_curve, 4.);
+        todo!("let (c1, f1) = fin_b(f1_curve,f1_a0,f1_a1,f1_func,0.3)");
+    }
+    bd = clip_multi(&bd, &c1, None).dont_clip;
+
+    let f2_curve;
+    let mut f2_func: Box<dyn Fn(f64) -> f64>;
+    let mut f2_a0;
+    let mut f2_a1;
+    if (arg.pelvic_type == 0) {
+        f2_a0 = -0.8 + deviate(0.05);
+        f2_a1 = -0.5 + deviate(0.05);
+        f2_func = Box::new(|t| {
+            (10. + (15. + noise(t * 3., None, None) * 60.) * f64::sin(t * PI).powf(0.5)) / 85.
+                * arg.pelvic_length
+        });
+    } else {
+        f2_a0 = -0.9 + deviate(0.05);
+        f2_a1 = -0.3 + deviate(0.05);
+        f2_func = Box::new(|t| (t * 0.5 + 0.5) * arg.pelvic_length);
+    }
+    let c2: Vec<Polyline>;
+    let f2;
+    if (arg.pelvic_texture_type == 0) {
+        f2_curve = resample(
+            &rev_slice(&curve1, arg.pelvic_start, arg.pelvic_end),
+            if arg.pelvic_type != 0 { 2. } else { 5. },
+        );
+        todo!("let (c2, f2) = fin_a(f2_curve,f2_a0,f2_a1,f2_func)");
+    } else {
+        f2_curve = resample(
+            &rev_slice(&curve1, arg.pelvic_start, arg.pelvic_end),
+            if arg.pelvic_type != 0 { 2. } else { 15. },
+        );
+        todo!("let (c2, f2) = fin_b(f2_curve,f2_a0,f2_a1,f2_func)");
+    }
+    f2 = clip_multi(&f2, &c1, None).dont_clip;
+
+    let f3_curve;
+    let f3_func: Box<dyn Fn(f64) -> f64>;
+    let f3_a0;
+    let f3_a1;
+    if (arg.anal_type == 0) {
+        f3_a0 = -0.4 + deviate(0.05);
+        f3_a1 = -0.4 + deviate(0.05);
+        f3_func = Box::new(|t| {
+            (10. + (10. + noise(t * 3., None, None) * 30.) * f64::sin(t * PI).powf(0.5)) / 50.
+                * arg.anal_length
+        });
+    } else {
+        f3_a0 = -0.4 + deviate(0.05);
+        f3_a1 = -0.4 + deviate(0.05);
+        f3_func = Box::new(|t| arg.anal_length * (t * t * 0.8 + 0.2));
+    }
+    let c3: Vec<Polyline>;
+    let f3;
+    if (arg.anal_texture_type == 0) {
+        f3_curve = resample(&rev_slice(&curve1, arg.anal_start, arg.anal_end), 5.);
+        todo!("let (c3, f3) = fin_a(f3_curve,f3_a0,f3_a1,f3_func)");
+    } else {
+        f3_curve = resample(&rev_slice(&curve1, arg.anal_start, arg.anal_end), 15.);
+        todo!("let (c3, f3) = fin_b(f3_curve,f3_a0,f3_a1,f3_func)");
+    }
+    f3 = clip_multi(&f3, &c1, None).dont_clip;
+
+    let f4_curve;
+    let c4;
+    let f4;
+    let f4_r = dist(curve0[curve0.len() - 2], curve1[curve1.len() - 2]);
+    let f4_n = (f4_r / 1.5).trunc();
+    f4_n = f64::max(f64::min(f4_n, 20.), 8.);
+    let f4_d = f4_r / f4_n;
+    // console.log(f4_n,f4_d);
+    if (arg.tail_type == 0) {
+        f4_curve = vec![curve0[curve0.len() - 1], curve1[curve1.len() - 1]];
+        f4_curve = resample(&f4_curve, f4_d);
+        todo!("let (c4,f4) = fin_a(f4_curve,-0.6,0.6,t=>(  (75-(10+noise(t*3)*10)*f64::sin(3*t*PI-PI))/75*arg.tail_length  ),1)");
+    } else if (arg.tail_type == 1) {
+        f4_curve = vec![curve0[curve0.len() - 2], curve1[curve1.len() - 2]];
+        f4_curve = resample(&f4_curve, f4_d);
+        todo!(
+            "let (c4, f4) = fin_a(f4_curve,-0.6,0.6,t=>( arg.tail_length*(f64::sin(t*PI)*0.5+0.5)  ),1)"
+        );
+    } else if (arg.tail_type == 2) {
+        f4_curve = vec![curve0[curve0.len() - 1], curve1[curve1.len() - 1]];
+        f4_curve = resample(&f4_curve, f4_d * 0.7);
+        let cv = arg.tail_length / 8;
+        todo!("let (c4,f4) = fin_a(f4_curve,-0.6,0.6,t=>(  (Math.abs(Math.cos(PI*t))*0.8+0.2)*arg.tail_length  ),1,cv,-cv)");
+    } else if (arg.tail_type == 3) {
+        f4_curve = vec![curve0[curve0.len() - 2], curve1[curve1.len() - 2]];
+        f4_curve = resample(&f4_curve, f4_d);
+        todo!(
+            "let (c4, f4) = fin_a(f4_curve,-0.6,0.6,t=>(  (1-f64::sin(t*PI)*0.3)*arg.tail_length  ),1)"
+        );
+    } else if (arg.tail_type == 4) {
+        f4_curve = vec![curve0[curve0.len() - 2], curve1[curve1.len() - 2]];
+        f4_curve = resample(&f4_curve, f4_d);
+        todo!("let (c4, f4) = fin_a(f4_curve,-0.6,0.6,t=>(  (1-f64::sin(t*PI)*0.6)*(1-t*0.45)*arg.tail_length  ),1)"
+        );
+    } else if (arg.tail_type == 5) {
+        f4_curve = vec![curve0[curve0.len() - 2], curve1[curve1.len() - 2]];
+        f4_curve = resample(&f4_curve, f4_d);
+        todo!("let (c4, f4) = fin_a(f4_curve,-0.6,0.6,t=>(  (1-f64::sin(t*PI)**0.4*0.55)*arg.tail_length  ),1)"
+        );
+    }
+    // f4 = clip_multi(f4,trsl_poly(outline,-1,0)).dont_clip;
+    bd = clip_multi(&bd, &trsl_poly(c4, 1., 0.), None).dont_clip;
+
+    f4 = clip_multi(&f4, &c1, None).dont_clip;
+
+    let f5_curve = vec![];
+    let c5 = vec![];
+    let f5 = vec![];
+    if (arg.finlet_type == 0) {
+        //pass
+    } else if (arg.finlet_type == 1) {
+        f5_curve = resample(&curve0[arg.dorsal_end..curve0.len() - 2], 5.);
+        todo!("let (c5, f5) = finlet(f5_curve,5)");
+        f5_curve = resample(&rev_slice(&curve1, arg.anal_end, curve1.len() - 2), 5.);
+        if (f5_curve.len() > 1) {
+            todo!("let (c5, f5) = finlet(f5_curve,5)");
+        }
+    } else if (arg.finlet_type == 2) {
+        f5_curve = resample(&curve0[27..30], 5.);
+        todo!("let (c5, f5) = fin_adipose(f5_curve,20,-5,6)");
+        outline = poly_union(&outline, &trsl_poly(&c5, 0., -1.), None);
+    } else {
+        f5_curve = resample(&curve0[arg.dorsal_end + 2..curve0.len() - 3], 5.);
+        if (f5_curve.len() > 2) {
+            todo!("let (c5,f5) = fin_a(f5_curve,0.2,0.3, t=>(  (0.3+noise(t*3)*0.7)*arg.dorsal_length*0.6 *f64::sin(t*PI)**0.5  ))");
+        }
+    }
+    let cf;
+    let fh: Vec<Polyline>;
+    if (arg.neck_type == 0) {
+        todo!("let (cf, fh) = fish_head(50-arg.head_length,150+arg.nose_height,...curve0[6],...curve1[5],arg)"
+        );
+    } else {
+        todo!("let (cf, fh) = fish_head(50-arg.head_length,150+arg.nose_height,...curve0[5],...curve1[6],arg)"
+        );
+    }
+    bd = clip_multi(&bd, &cf, None).dont_clip;
+
+    sh = clip_multi(&sh, &cf, None).dont_clip;
+    sh = clip_multi(&sh, &c1, None).dont_clip;
+
+    f1 = clip_multi(&f1, &cf, None).dont_clip;
+
+    f0 = clip_multi(&f0, &c1, None).dont_clip;
+
+    let sh2 = vec![];
+    if let Some(func) = (pattern_func) {
+        if (arg.scale_type > 1) {
+            sh2 = todo!(
+                "patternshade_shape(&poly_union(outline, &trsl_poly(c0, 0., 3.), None),3.5,func)"
+            );
+        } else {
+            sh2 = todo!("patternshade_shape(c0, 4.5, func)");
+        }
+        sh2 = clip_multi(&sh2, &cf, None).dont_clip;
+        sh2 = clip_multi(&sh2, &c1, None).dont_clip;
+    }
+
+    let sh3 = [];
+    if (arg.pattern_type == 4) {
+        sh3 = todo!("smalldot_shape(poly_union(outline, trsl_poly(c0, 0, 5)), arg.pattern_scale)");
+        sh3 = todo!("clip_multi(&sh3, &c1, None).dont_clip");
+        sh3 = todo!("clip_multi(&sh3, &cf, None).dont_clip");
+    }
+    bd.extend(f0);
+    bd.extend(f1);
+    bd.extend(f2);
+    bd.extend(f3);
+    bd.extend(f4);
+    bd.extend(f5);
+    bd.extend(fh);
+    bd.extend(sh);
+    bd.extend(sh2);
+    bd.extend(sh3);
+    // bd.extend([cf]);
+    bd
+}
 
 fn put_text(txt: String) -> (f64, Vec<Vec<(f64, f64)>>) {
     let base = 500;

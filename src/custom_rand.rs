@@ -141,6 +141,6 @@ pub fn rndtri_f(a: f64, b: f64, c: f64) -> f64 {
     return c - d;
 }
 
-fn deviate(n: f64) -> f64 {
+pub fn deviate(n: f64) -> f64 {
     return (rand() as f64 * 2. * n) - n;
 }
