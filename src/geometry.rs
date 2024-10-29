@@ -611,25 +611,26 @@ pub fn shade_shape(
     lines
 }
 
-/*
+pub fn fill_shape(poly: &Polyline, step_opt: Option<usize>) -> Vec<Vec<(f64, f64)>> {
+    let step = step_opt.unwrap_or(5);
+    let mut bbox = get_boundingbox(poly);
+    bbox.x -= step as f64;
+    bbox.y -= step as f64;
+    bbox.w += step as f64 * 2.;
+    bbox.h += step as f64 * 2.;
+    let mut lines = vec![];
+    for i in (0..(bbox.w + bbox.h) as usize / 2).step_by(step) {
+        let x0 = bbox.x + i as f64;
+        let y0 = bbox.y;
+        let x1 = bbox.x + i as f64 - bbox.h / 2.;
+        let y1 = bbox.y + bbox.h;
+        lines.push(vec![(x0, y0), (x1, y1)]);
+    }
+    lines = clip_multi(&lines, &poly, None).clip;
 
-pub fn fill_shape(poly,step=5){
-  let bbox = get_boundingbox(poly);
-  bbox.x -= step;
-  bbox.y -= step;
-  bbox.w += step*2;
-  bbox.h += step*2;
-  let lines = [];
-  for i in 0..bbox.w+bbox.h/2; i+=step){
-    let x0 = bbox.x + i;
-    let y0 = bbox.y;
-    let x1 = bbox.x + i - bbox.h/2;
-    let y1 = bbox.y + bbox.h;
-    lines.push([[x0,y0],[x1,y1]]);
-  }
-  lines = clip_multi(lines,poly).clip;
-  return lines;
+    return lines;
 }
+/*
 
 pub fn patternshade_shape(poly,step=5,pattern_func){
   let bbox = get_boundingbox(poly);
@@ -811,32 +812,36 @@ pub fn resample(polyline_slice: &[Point], step: f64) -> Vec<Point> {
     return out;
 }
 
-/*
-pub fn pt_seg_dist(p, p0, p1)  {
-  // https://stackoverflow.com/a/6853926
-  let x = p[0];   let y = p[1];
-  let x1 = p0[0]; let y1 = p0[1];
-  let x2 = p1[0]; let y2 = p1[1];
-  let A = x - x1; let B = y - y1; let C = x2 - x1; let D = y2 - y1;
-  let dot = A*C+B*D;
-  let len_sq = C*C+D*D;
-  let param = -1;
-  if (len_sq != 0) {
-    param = dot / len_sq;
-  }
-  let xx; let yy;
-  if (param < 0) {
-    xx = x1; yy = y1;
-  }else if (param > 1) {
-    xx = x2; yy = y2;
-  }else {
-    xx = x1 + param*C;
-    yy = y1 + param*D;
-  }
-  let dx = x - xx;
-  let dy = y - yy;
-  return Math.sqrt(dx*dx+dy*dy);
+pub fn pt_seg_dist((x, y): Point, (x1, y1): Point, (x2, y2): Point) -> f64 {
+    // https://stackoverflow.com/a/6853926
+    let a = x - x1;
+    let b = y - y1;
+    let c = x2 - x1;
+    let d = y2 - y1;
+    let dot = a * c + b * d;
+    let len_sq = c * c + d * d;
+    let mut param = -1.;
+    if (len_sq != 0.) {
+        param = dot / len_sq;
+    }
+    let xx;
+    let yy;
+    if (param < 0.) {
+        xx = x1;
+        yy = y1;
+    } else if (param > 1.) {
+        xx = x2;
+        yy = y2;
+    } else {
+        xx = x1 + param * c;
+        yy = y1 + param * d;
+    }
+    let dx = x - xx;
+    let dy = y - yy;
+    return f64::sqrt(dx * dx + dy * dy);
 }
+/*
+
 
 pub fn approx_poly_dp(polyline, epsilon){
   if (polyline.len() <= 2){

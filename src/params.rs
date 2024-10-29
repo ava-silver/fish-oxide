@@ -35,19 +35,19 @@ pub struct Params {
     pub tail_length: i32,
     pub finlet_type: i32,
     pub neck_type: i32,
-    pub nose_height: i32,
-    pub mouth_size: i32,
-    pub head_length: i32,
+    pub nose_height: f64,
+    pub mouth_size: usize,
+    pub head_length: f64,
     pub head_texture_amount: i32,
     pub has_moustache: i32,
-    pub moustache_length: i32,
+    pub moustache_length: usize,
     pub has_beard: i32,
     pub has_teeth: i32,
     pub teeth_length: i32,
     pub teeth_space: f64,
-    pub beard_length: i32,
+    pub beard_length: usize,
     pub eye_type: i32,
-    pub eye_size: i32,
+    pub eye_size: f64,
     pub jaw_size: f64,
     pub jaw_open: i32,
 }
@@ -88,9 +88,9 @@ impl Params {
             tail_length: 75,
             finlet_type: 0,
             neck_type: 0,
-            nose_height: 0,
+            nose_height: 0.,
             mouth_size: 8,
-            head_length: 30,
+            head_length: 30.,
             head_texture_amount: 60,
             has_moustache: 1,
             moustache_length: 10,
@@ -100,7 +100,7 @@ impl Params {
             teeth_space: 3.5,
             beard_length: 30,
             eye_type: 1,
-            eye_size: 10,
+            eye_size: 10.,
             jaw_size: 1.,
             jaw_open: 1,
         }
@@ -176,18 +176,18 @@ pub fn generate_params() -> Params {
     arg.finlet_type = *choice(&[0, 1, 2, 3], None);
 
     arg.neck_type = *choice(&[0, 1], None);
-    arg.nose_height = rndtri(-50, 0, 35);
-    arg.head_length = rndtri(20, 30, 35);
-    arg.mouth_size = !!rndtri(6, 8, 11);
+    arg.nose_height = rndtri_f(-50., 0., 35.);
+    arg.head_length = rndtri_f(20., 30., 35.);
+    arg.mouth_size = rndtri(6, 8, 11) as usize;
 
     arg.head_texture_amount = !!rndtri(30, 60, 160);
     arg.has_moustache = *choice(&[0, 0, 0, 1], None);
     arg.has_beard = *choice(&[0, 0, 0, 0, 0, 1], None);
-    arg.moustache_length = !!rndtri(10, 20, 40);
-    arg.beard_length = !!rndtri(20, 30, 50);
+    arg.moustache_length = rndtri(10, 20, 40) as usize;
+    arg.beard_length = rndtri(20, 30, 50) as usize;
 
     arg.eye_type = *choice(&[0, 1], None);
-    arg.eye_size = rndtri(8, 10, 28); //arg.body_height/6//Math.min(arg.body_height/6,rndtri(8,10,30));
+    arg.eye_size = rndtri_f(8., 10., 28.); //arg.body_height/6//Math.min(arg.body_height/6,rndtri(8,10,30));
 
     arg.jaw_size = rndtri_f(0.7, 1., 1.4);
 
