@@ -1,10 +1,10 @@
 use std::f64::consts::{E, PI};
 
 use crate::{
-    custom_rand::{deviate, noise, rand},
+    custom_rand::{deviate, noise, rand, randf},
     geometry::{
         clip, clip_multi, dist, fill_shape, get_boundingbox, lerp, lerp2d, poly_union, pt_seg_dist,
-        resample, shade_shape, trsl_poly, Point, Polyline,
+        resample, shade_shape, trsl_poly, vein_shape, Point, Polyline,
     },
     hershey::compile_hershey,
     params::Params,
@@ -551,93 +551,98 @@ pub fn fin_adipose(curve,dx,dy,r){
   return [cc,[out0,...out1]];
 
 }
-
-
-pub fn fish_lip(x0,y0,x1,y1,w){
-  x0 += rand()*0.001-0.0005;
-  y0 += rand()*0.001-0.0005;
-  x1 += rand()*0.001-0.0005;
-  y1 += rand()*0.001-0.0005;
-  let h = dist(x0,y0,x1,y1);
-  let a0 = Math.atan2(y1-y0,x1-x0);
-  let n = 10;
-  let ang = Math.acos(w/h);
-  let dx = Math.cos(a0+PI/2)*0.5;
-  let dy = f64::sin(a0+PI/2)*0.5;
-  let o = [[x0-dx,y0-dy]];
-  for i in 0..n {
-    let t = i/(n-1);
-    let a = lerp(ang,PI*2-ang,t) + a0;
-    let x = -Math.cos(a)*w + x1;
-    let y = -f64::sin(a)*w + y1;
-    o.push([x,y]);
-  }
-  o.push([x0+dx,y0+dy]);
-  o = resample(o,2.5);
-  for i in 0..o.len() {
-    let [x,y] = o[i];
-    o[i][0] += noise(x*0.05,y*0.05,-1)*2-1;
-    o[i][1] += noise(x*0.05,y*0.05,-2)*2-1;
-  }
-  return o;
-}
-
-pub fn fish_teeth(x0,y0,x1,y1,h,dir,sep=3.5){
-  let n = Math.max(2,!!(dist(x0,y0,x1,y1)/sep));
-  let ang = Math.atan2(y1-y0,x1-x0);
-  let out = [];
-  for i in 0..n {
-    let t = i/(n-1);
-    let a = lerp2d(x0,y0,x1,y1,t);
-    let w = h*t;
-    let b = [
-      a[0]+Math.cos(ang+dir*PI/2)*w,
-      a[1]+f64::sin(ang+dir*PI/2)*w,
-    ];
-    let c = [
-      a[0] + 1 * Math.cos(ang),
-      a[1] + 1 * f64::sin(ang),
-    ];
-    let d = [
-      a[0] + 1 * Math.cos(ang+PI),
-      a[1] + 1 * f64::sin(ang+PI),
-    ];
-    let e = lerp2d(...c,...b,0.7);
-    let f = lerp2d(...d,...b,0.7);
-    let g = [
-      a[0]+Math.cos(ang+dir*(PI/2+0.15))*w,
-      a[1]+f64::sin(ang+dir*(PI/2+0.15))*w,
-    ]
-    out.push([c,e,g,f,d])
-    // out.push(barbel(...a,10,ang+dir*PI/2))
-  }
-  return out;
-}
-
-pub fn fish_jaw(x0,y0,x1,y1,x2,y2){
-  let n = 10;
-  let ang = Math.atan2(y2-y0,x2-x0);
-  let d = dist(x0,y0,x2,y2);
-  let o = [];
-  for i in 0..n {
-    let t = i/(n-1);
-    let s = f64::sin(t*PI);
-    let w = s*d/20;
-    let p = lerp2d(x2,y2,x0,y0,t);
-    let q = [
-      p[0] + Math.cos(ang-PI/2)*w,
-      p[1] + f64::sin(ang-PI/2)*w,
-    ]
-    let qq = [
-      q[0] + (noise(q[0]*0.01,q[1]*0.01,1)-0.5)*4*s,
-      q[1] + (noise(q[0]*0.01,q[1]*0.01,4)-0.5)*4*s,
-    ];
-    o.push(qq);
-  }
-  return [[[x2,y2],[x1,y1],[x0,y0]],[o,...vein_shape(o,5)]];
-}
-
 */
+
+pub fn fish_lip((mut x0, mut y0): Point, (mut x1, mut y1): Point, w: f64) -> Polyline {
+    x0 += randf() * 0.001 - 0.0005;
+    y0 += randf() * 0.001 - 0.0005;
+    x1 += randf() * 0.001 - 0.0005;
+    y1 += randf() * 0.001 - 0.0005;
+    let h = dist((x0, y0), (x1, y1));
+    let a0 = f64::atan2(y1 - y0, x1 - x0);
+    let n = 10;
+    let ang = f64::acos(w / h);
+    let dx = f64::cos(a0 + PI / 2.) * 0.5;
+    let dy = f64::sin(a0 + PI / 2.) * 0.5;
+    let mut o = vec![(x0 - dx, y0 - dy)];
+    for i in 0..n {
+        let t = i / (n - 1);
+        let a = lerp(ang, PI * 2. - ang, t as f64) + a0;
+        let x = -f64::cos(a) * w + x1;
+        let y = -f64::sin(a) * w + y1;
+        o.push((x, y));
+    }
+    o.push((x0 + dx, y0 + dy));
+    o = resample(&o, 2.5);
+    for i in 0..o.len() {
+        let (x, y) = o[i];
+        o[i].0 += noise(x * 0.05, Some(y * 0.05), Some(-1.)) * 2. - 1.;
+        o[i].1 += noise(x * 0.05, Some(y * 0.05), Some(-2.)) * 2. - 1.;
+    }
+    return o;
+}
+
+pub fn fish_teeth(
+    (x0, y0): Point,
+    (x1, y1): Point,
+    h: f64,
+    dir: i32,
+    sep_opt: Option<f64>,
+) -> Vec<Polyline> {
+    let sep = sep_opt.unwrap_or(3.5);
+    let n = f64::max(2., (dist((x0, y0), (x1, y1)).trunc() / sep)) as i64;
+    let ang = f64::atan2(y1 - y0, x1 - x0);
+    let mut out = vec![];
+    for i in 0..n {
+        let t = i as f64 / (n as f64 - 1.);
+        let a = lerp2d((x0, y0), (x1, y1), t);
+        let w = h * t;
+        let b = (
+            a.0 + f64::cos(ang + dir as f64 * PI / 2.) * w,
+            a.1 + f64::sin(ang + dir as f64 * PI / 2.) * w,
+        );
+        let c = (a.0 + 1. * f64::cos(ang), a.1 + 1. * f64::sin(ang));
+        let d = (a.0 + 1. * f64::cos(ang + PI), a.1 + 1. * f64::sin(ang + PI));
+        let e = lerp2d(c, b, 0.7);
+        let f = lerp2d(d, b, 0.7);
+        let g = (
+            a.0 + f64::cos(ang + dir as f64 * (PI / 2. + 0.15)) * w,
+            a.1 + f64::sin(ang + dir as f64 * (PI / 2. + 0.15)) * w,
+        );
+        out.push(vec![c, e, g, f, d])
+        // out.push(barbel(...a,10,ang+dir*PI/2))
+    }
+    return out;
+}
+
+pub fn fish_jaw((x0, y0): Point, (x1, y1): Point, (x2, y2): Point) -> (Polyline, Vec<Polyline>) {
+    let n = 10;
+    let ang = f64::atan2(y2 - y0, x2 - x0);
+    let d = dist((x0, y0), (x2, y2));
+    let mut o = vec![];
+    for i in 0..n {
+        let t = i as f64 / (n as f64 - 1.);
+        let s = f64::sin(t * PI);
+        let w = s * d / 20.;
+        let p = lerp2d((x2, y2), (x0, y0), t);
+        let q = (
+            p.0 + f64::cos(ang - PI / 2.) * w,
+            p.1 + f64::sin(ang - PI / 2.) * w,
+        );
+        let qq = (
+            q.0 + (noise(q.0 * 0.01, Some(q.1 * 0.01), Some(1.)) - 0.5) * 4. * s,
+            q.1 + (noise(q.0 * 0.01, Some(q.1 * 0.01), Some(4.)) - 0.5) * 4. * s,
+        );
+        o.push(qq);
+    }
+    return (
+        vec![(x2, y2), (x1, y1), (x0, y0)],
+        vec![o.clone()]
+            .into_iter()
+            .chain(vein_shape(&o, Some(5)))
+            .collect(),
+    );
+}
 
 pub fn fish_eye_a(ex: f64, ey: f64, rad: f64) -> (Polyline, Vec<Polyline>) {
     let n = 20;
@@ -731,7 +736,7 @@ pub fn fish_eye_b(ex: f64, ey: f64, rad: f64) -> (Polyline, Vec<Polyline>) {
 pub fn barbel((mut x, mut y): Point, n: usize, mut ang: f64, dd_opt: Option<f64>) -> Polyline {
     let dd = dd_opt.unwrap_or(3.);
     let mut curve = vec![(x, y)];
-    let sd = rand() as f64 * PI * 2.;
+    let sd = randf() * PI * 2.;
     let mut ar = 1.;
     for i in 0..n {
         x += f64::cos(ang) * dd;
@@ -781,8 +786,8 @@ pub fn fish_head(
     (x0, y0): Point,
     (x1, y1): Point,
     (x2, y2): Point,
-    arg: Params,
-) -> (Polyline, Polyline) {
+    mut arg: Params,
+) -> (Polyline, Vec<Polyline>) {
     let n = 20;
     let mut curve0 = vec![];
     let mut curve1 = vec![];
@@ -827,7 +832,7 @@ pub fn fish_head(
         .map(|p| *p)
         .collect();
 
-    let inline: Polyline = curve2[(curve2.len() / 3)..]
+    let mut inline: Polyline = curve2[(curve2.len() / 3)..]
         .iter()
         .chain(curve1[0..curve1.len() / 2].iter())
         .take(curve0.len())
@@ -845,8 +850,8 @@ pub fn fish_head(
     }
 
     let par = [0.475, 0.375];
-    let ex = x0 * par[0] + x1 * par[1] + x2 * (1. - par[0] - par[1]);
-    let ey = y0 * par[0] + y1 * par[1] + y2 * (1. - par[0] - par[1]);
+    let mut ex = x0 * par[0] + x1 * par[1] + x2 * (1. - par[0] - par[1]);
+    let mut ey = y0 * par[0] + y1 * par[1] + y2 * (1. - par[0] - par[1]);
     let d0 = pt_seg_dist((ex, ey), (x0, y0), (x1, y1));
     let d1 = pt_seg_dist((ex, ey), (x0, y0), (x2, y2));
     if (d0 < arg.eye_size && d1 < arg.eye_size) {
@@ -860,13 +865,13 @@ pub fn fish_head(
     let jaw_pt0 = curve1[(18 - arg.mouth_size)];
     let jaw_l = dist(jaw_pt0, curve1[18]) * arg.jaw_size;
     let jaw_ang0 = f64::atan2(curve1[18].1 - jaw_pt0.1, curve1[18].0 - jaw_pt0.0);
-    let jaw_ang = jaw_ang0 - (arg.has_teeth.into() * 0.5 + 0.5) * arg.jaw_open * PI / 4;
+    let jaw_ang = jaw_ang0 - (arg.has_teeth as f64 * 0.5 + 0.5) * arg.jaw_open as f64 * PI / 4.;
     let jaw_pt1 = (
         jaw_pt0.0 + f64::cos(jaw_ang) * jaw_l,
         jaw_pt0.1 + f64::sin(jaw_ang) * jaw_l,
     );
 
-    let (eye0, ef) = (if arg.eye_type != 0 {
+    let (eye0, mut ef) = (if arg.eye_type != 0 {
         fish_eye_b(ex, ey, arg.eye_size)
     } else {
         fish_eye_a(ex, ey, arg.eye_size)
@@ -875,11 +880,11 @@ pub fn fish_head(
 
     let inlines = clip(&inline, &eye0).dont_clip;
 
-    let lip0 = fish_lip(jaw_pt0, curve1[18], 3);
+    let lip0 = fish_lip(jaw_pt0, curve1[18], 3.);
 
-    let lip1 = fish_lip(jaw_pt0, jaw_pt1, 3);
+    let lip1 = fish_lip(jaw_pt0, jaw_pt1, 3.);
 
-    let [jc, jaw] = fish_jaw(curve1[15 - arg.mouth_size], jaw_pt0, jaw_pt1);
+    let (jc, mut jaw) = fish_jaw(curve1[15 - arg.mouth_size], jaw_pt0, jaw_pt1);
 
     jaw = clip_multi(&jaw, &lip1, None).dont_clip;
     jaw = clip_multi(&jaw, &outline, None).dont_clip;
@@ -887,8 +892,20 @@ pub fn fish_head(
     let mut teeth0s = vec![];
     let mut teeth1s = vec![];
     if (arg.has_teeth != 0) {
-        let teeth0 = fish_teeth(jaw_pt0, curve1[18], arg.teeth_length, -1, arg.teeth_space);
-        let teeth1 = fish_teeth(jaw_pt0, jaw_pt1, arg.teeth_length, 1, arg.teeth_space);
+        let teeth0 = fish_teeth(
+            jaw_pt0,
+            curve1[18],
+            arg.teeth_length as f64,
+            -1,
+            Some(arg.teeth_space),
+        );
+        let teeth1 = fish_teeth(
+            jaw_pt0,
+            jaw_pt1,
+            arg.teeth_length as f64,
+            1,
+            Some(arg.teeth_space),
+        );
 
         teeth0s = clip_multi(&teeth0, &lip0, None).dont_clip;
         teeth1s = clip_multi(&teeth1, &lip1, None).dont_clip;
@@ -898,11 +915,11 @@ pub fn fish_head(
 
     let lip0s = clip(&lip0, &lip1).dont_clip;
 
-    let sh = shade_shape(&outline, Some(6.), Some(-6.), Some(-6.));
+    let mut sh = shade_shape(&outline, Some(6.), Some(-6.), Some(-6.));
     sh = clip_multi(&sh, &lip0, None).dont_clip;
     sh = clip_multi(&sh, &eye0, None).dont_clip;
 
-    let sh2 = vein_shape(outline, arg.head_texture_amount);
+    let mut sh2 = vein_shape(&outline, Some(arg.head_texture_amount));
 
     // let sh2 = patternshade_shape(outline,3,(x,y)=>{
     //   return noise(x*0.1,y*0.1)>0.6;
@@ -913,7 +930,7 @@ pub fn fish_head(
 
     let mut bbs = vec![];
 
-    let lip1s = vec![lip1];
+    let mut lip1s = vec![lip1.clone()];
 
     if (arg.has_moustache != 0) {
         let bb0 = barbel(jaw_pt0, arg.moustache_length, PI * 3. / 4., Some(1.5));
@@ -924,7 +941,7 @@ pub fn fish_head(
 
     if (arg.has_beard != 0) {
         let jaw_pt;
-        if (jaw[0] && jaw[0].len()) {
+        if (!jaw.is_empty() && !jaw[0].is_empty()) {
             jaw_pt = jaw[0][!!(jaw[0].len() / 2)];
         } else {
             jaw_pt = curve1[8];
@@ -933,34 +950,34 @@ pub fn fish_head(
             &barbel(
                 jaw_pt,
                 arg.beard_length,
-                PI * 0.6 + rand() as f64 * 0.4 - 0.2,
+                PI * 0.6 + randf() * 0.4 - 0.2,
                 None,
             ),
-            rand() as f64 * 1. - 0.5,
-            rand() as f64 * 1. - 0.5,
+            randf() * 1. - 0.5,
+            randf() * 1. - 0.5,
         );
         let bb2 = trsl_poly(
             &barbel(
                 jaw_pt,
                 arg.beard_length,
-                PI * 0.6 + rand() as f64 * 0.4 - 0.2,
+                PI * 0.6 + randf() * 0.4 - 0.2,
                 None,
             ),
-            rand() as f64 * 1. - 0.5,
-            rand() as f64 * 1. - 0.5,
+            randf() * 1. - 0.5,
+            randf() * 1. - 0.5,
         );
         let bb3 = trsl_poly(
             &barbel(
                 jaw_pt,
                 arg.beard_length,
-                PI * 0.6 + rand() as f64 * 0.4 - 0.2,
+                PI * 0.6 + randf() * 0.4 - 0.2,
                 None,
             ),
-            rand() as f64 * 1. - 0.5,
-            rand() as f64 * 1. - 0.5,
+            randf() * 1. - 0.5,
+            randf() * 1. - 0.5,
         );
 
-        let bb3c = clip_multi(&vec![bb3], &bb2, None).dont_clip;
+        let mut bb3c = clip_multi(&vec![bb3], &bb2, None).dont_clip;
         bb3c = clip_multi(&bb3c, &bb1, None).dont_clip;
         let bb2c = clip_multi(&vec![bb2], &bb1, None).dont_clip;
         bbs.push(bb1);

@@ -17,6 +17,10 @@ pub fn rand() -> u64 {
     return (reg >> 0) / 4294967295;
 }
 
+pub fn randf() -> f64 {
+    return rand() as f64;
+}
+
 pub fn seed_rand(seed: u64) {
     JSR.store(seed, Ordering::SeqCst);
 }

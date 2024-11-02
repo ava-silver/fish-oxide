@@ -1,4 +1,4 @@
-use crate::custom_rand::rand;
+use crate::custom_rand::{noise, rand, randf};
 use std::{
     collections::HashMap,
     f64::consts::{E, PI},
@@ -598,7 +598,7 @@ pub fn shade_shape(
         let line = &lines[i];
         let mut a = line[0];
         let mut b = line[1];
-        let s = (rand() as f64) * 0.5;
+        let s = (randf()) * 0.5;
         if dy > 0. {
             a = lerp2d(a, b, s);
             lines[i][0] = a;
@@ -661,27 +661,28 @@ pub fn patternshade_shape(poly,step=5,pattern_func){
   return lines;
 }
 
-
-pub fn vein_shape(poly,n=50){
-  let bbox = get_boundingbox(poly);
-  let out = [];
-  for i in 0..n {
-    let x = bbox.x + rand()*bbox.w;
-    let y = bbox.y + rand()*bbox.h;
-    let o = [[x,y]];
-    for j in 0..15 {
-      let dx = (noise(x*0.1,y*0.1,7)-0.5)*4;
-      let dy = (noise(x*0.1,y*0.1,6)-0.5)*4;
-      x += dx;
-      y += dy;
-      o.push([x,y]);
+*/
+pub fn vein_shape(poly: &Polyline, n_opt: Option<i32>) -> Vec<Polyline> {
+    let n = n_opt.unwrap_or(50);
+    let bbox = get_boundingbox(poly);
+    let mut out = vec![];
+    for i in 0..n {
+        let mut x = bbox.x + randf() * bbox.w;
+        let mut y = bbox.y + randf() * bbox.h;
+        let mut o = vec![(x, y)];
+        for j in 0..15 {
+            let dx = (noise(x * 0.1, Some(y * 0.1), Some(7.)) - 0.5) * 4.;
+            let dy = (noise(x * 0.1, Some(y * 0.1), Some(6.)) - 0.5) * 4.;
+            x += dx;
+            y += dy;
+            o.push((x, y));
+        }
+        out.push(o);
     }
-    out.push(o);
-  }
-  out = clip_multi(out,poly).clip;
-  return out;
+    out = clip_multi(&out, poly, None).clip;
+    return out;
 }
-
+/*
 pub fn smalldot_shape(poly,scale=1){
   let samples = [];
   let bbox = get_boundingbox(poly);
