@@ -126,7 +126,7 @@ pub fn binomen() -> String {
     );
 }
 
-static HERSHEY_RAW: LazyLock<HashMap<i32, &'static str>> = LazyLock::new(|| {
+static HERSHEY_RAW: LazyLock<HashMap<i64, &'static str>> = LazyLock::new(|| {
     HashMap::from([
         (501, "  9I[RFJ[ RRFZ[ RMTWT"),
         (502, " 24G\\KFK[ RKFTFWGXHYJYLXNWOTP RKPTPWQXRYTYWXYWZT[K["),
@@ -189,7 +189,7 @@ static HERSHEY_RAW: LazyLock<HashMap<i32, &'static str>> = LazyLock::new(|| {
 
 // let hershey_cache = {};
 
-pub fn compile_hershey(i: i32) -> (i32, i32, Vec<Vec<(f64, f64)>>) {
+pub fn compile_hershey(i: i64) -> (i64, i64, Vec<Vec<(f64, f64)>>) {
     // if (hershey_cache[i]){
     //   return hershey_cache[i];
     // }
@@ -199,8 +199,8 @@ pub fn compile_hershey(i: i32) -> (i32, i32, Vec<Vec<(f64, f64)>>) {
     };
     let ord_r = 82;
     let mut bound = &mut entry[3..5].chars();
-    let xmin = (bound.next().unwrap() as i32) - ord_r;
-    let xmax = (bound.next().unwrap() as i32) - ord_r;
+    let xmin = (bound.next().unwrap() as i64) - ord_r;
+    let xmax = (bound.next().unwrap() as i64) - ord_r;
     let content = &entry[5..];
     let mut polylines = vec![vec![]];
     let mut j = 0;
@@ -210,8 +210,8 @@ pub fn compile_hershey(i: i32) -> (i32, i32, Vec<Vec<(f64, f64)>>) {
             polylines.push(vec![]);
         } else {
             let mut chars = digit.chars();
-            let x = (chars.next().unwrap() as i32) - ord_r;
-            let y = (chars.next().unwrap() as i32) - ord_r;
+            let x = (chars.next().unwrap() as i64) - ord_r;
+            let y = (chars.next().unwrap() as i64) - ord_r;
             polylines.last_mut().unwrap().push((x as f64, y as f64));
         }
         j += 2;

@@ -586,7 +586,7 @@ pub fn fish_teeth(
     (x0, y0): Point,
     (x1, y1): Point,
     h: f64,
-    dir: i32,
+    dir: i64,
     sep_opt: Option<f64>,
 ) -> Vec<Polyline> {
     let sep = sep_opt.unwrap_or(3.5);
@@ -1364,7 +1364,7 @@ fn put_text(txt: String) -> (f64, Vec<Vec<(f64, f64)>>) {
     let mut x = 0.;
     let mut o = vec![];
     for c in txt.chars() {
-        let ord = c as i32;
+        let ord = c as i64;
         let idx;
         if (65 <= ord && ord <= 90) {
             idx = base + 1 + (ord - 65);

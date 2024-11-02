@@ -1,3 +1,4 @@
+use rand::{seq::SliceRandom, thread_rng};
 use std::{
     f64::consts::PI,
     sync::{
@@ -102,6 +103,7 @@ pub fn noise(mut x: f64, y_opt: Option<f64>, z_opt: Option<f64>) -> f64 {
 }
 
 pub fn choice<'a, T>(opts: &'a [T], percs_opt: Option<&[u32]>) -> &'a T {
+    return opts.choose(&mut thread_rng()).unwrap();
     let default_percs = opts.iter().map(|_| 1).collect::<Vec<_>>();
     let percs = percs_opt.unwrap_or(&default_percs);
     let mut s = percs.iter().sum();
@@ -116,19 +118,19 @@ pub fn choice<'a, T>(opts: &'a [T], percs_opt: Option<&[u32]>) -> &'a T {
     unreachable!();
 }
 
-pub fn rndtri(a: i32, b: i32, c: i32) -> i32 {
+pub fn rndtri(a: i64, b: i64, c: i64) -> i64 {
     let mut s0 = (b - a) / 2;
     let mut s1 = (c - b) / 2;
     let mut s = s0 + s1;
-    let mut r = rand() as i32 * s;
+    let mut r = rand() as i64 * s;
     if (r < s0) {
         //d * d/(b-a) / 2 = r;
         let mut d = ((2 * r * (b - a)) as f32).sqrt();
-        return a + d as i32;
+        return a + d as i64;
     }
     //d * d/(c-b) / 2 = s-r;
     let mut d = ((2 * (s - r) * (c - b)) as f32).sqrt();
-    return c - d as i32;
+    return c - d as i64;
 }
 pub fn rndtri_f(a: f64, b: f64, c: f64) -> f64 {
     let mut s0 = (b - a) / 2.;

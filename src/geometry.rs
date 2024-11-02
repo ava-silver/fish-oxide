@@ -50,7 +50,7 @@ pub fn get_boundingbox(points: &Polyline) -> BoundingBox {
 pub struct Intersection {
     t: f64,
     s: f64,
-    side: i32,
+    side: i64,
     other: Option<usize>,
     xy: Option<Point>,
     jump: Option<bool>,
@@ -66,7 +66,7 @@ pub fn pt_in_pl((x, y): Point, (x0, y0): Point, (x1, y1): Point) -> f64 {
     (x - x0) * dy - (y - y0) * dx
 }
 
-pub fn get_side((x, y): Point, (x0, y0): Point, (x1, y1): Point) -> i32 {
+pub fn get_side((x, y): Point, (x0, y0): Point, (x1, y1): Point) -> i64 {
     if pt_in_pl((x, y), (x0, y0), (x1, y1)) < 0. {
         1
     } else {
@@ -276,13 +276,13 @@ pub fn poly_union(poly0: &Polyline, poly1: &Polyline, self_isect_opt: Option<boo
         verts0: &mut Vec<Vertex>,
         verts1: &mut Vec<Vertex>,
         idx: usize,
-        isect_mir: &mut HashMap<(usize, usize, i32), (usize, usize, i32)>,
+        isect_mir: &mut HashMap<(usize, usize, i64), (usize, usize, i64)>,
     ) {
         let n = verts0.len();
         for i in 0..n {
             let m = verts0[i].isects.len();
             for j in 0..m {
-                let id = (idx, i, j as i32);
+                let id = (idx, i, j as i64);
                 let jump = verts0[i].isects[j].jump.unwrap_or(false);
                 let jd = if jump { 1 - idx } else { idx };
                 let k = verts0[i].isects[j].other.unwrap();
@@ -291,7 +291,7 @@ pub fn poly_union(poly0: &Polyline, poly1: &Polyline, self_isect_opt: Option<boo
                     .iter()
                     .position(|x| (x.jump == Some(jump) && x.other == Some(i)))
                     .unwrap();
-                isect_mir.insert(id, (jd, k, z as i32));
+                isect_mir.insert(id, (jd, k, z as i64));
             }
         }
     }
@@ -301,22 +301,22 @@ pub fn poly_union(poly0: &Polyline, poly1: &Polyline, self_isect_opt: Option<boo
     pub fn trace_outline(
         idx: usize,
         i0: usize,
-        j0: i32,
-        dir: i32,
+        j0: i64,
+        dir: i64,
         verts0: &Vec<Vertex>,
         verts1: &Vec<Vertex>,
-        isect_mir: &HashMap<(usize, usize, i32), (usize, usize, i32)>,
+        isect_mir: &HashMap<(usize, usize, i64), (usize, usize, i64)>,
     ) -> Option<Polyline> {
         pub fn trace_from(
-            mut zero: Option<(usize, usize, i32)>,
+            mut zero: Option<(usize, usize, i64)>,
             verts0: &Vec<Vertex>,
             verts1: &Vec<Vertex>,
             idx: usize,
             i0: usize,
-            j0: i32,
-            dir: i32,
+            j0: i64,
+            dir: i64,
             out: &mut Polyline,
-            isect_mir: &HashMap<(usize, usize, i32), (usize, usize, i32)>,
+            isect_mir: &HashMap<(usize, usize, i64), (usize, usize, i64)>,
         ) -> bool {
             if zero == None {
                 zero = Some((idx, i0, j0));
@@ -326,7 +326,7 @@ pub fn poly_union(poly0: &Polyline, poly1: &Polyline, self_isect_opt: Option<boo
             let verts = if idx > 0 { verts1 } else { verts0 };
             let n = verts.len();
             let p = &verts[i0];
-            let i1 = (((i0 + n) as i32) + dir) as usize % n;
+            let i1 = (((i0 + n) as i64) + dir) as usize % n;
             if j0 == -1 {
                 out.push(p.xy);
                 if dir < 0 {
@@ -336,7 +336,7 @@ pub fn poly_union(poly0: &Polyline, poly1: &Polyline, self_isect_opt: Option<boo
                         verts1,
                         idx,
                         i1,
-                        verts[i1].isects.len() as i32 - 1,
+                        verts[i1].isects.len() as i64 - 1,
                         dir,
                         out,
                         isect_mir,
@@ -346,7 +346,7 @@ pub fn poly_union(poly0: &Polyline, poly1: &Polyline, self_isect_opt: Option<boo
                 } else {
                     return trace_from(zero, verts0, verts1, idx, i0, 0, dir, out, isect_mir);
                 }
-            } else if j0 >= p.isects.len() as i32 {
+            } else if j0 >= p.isects.len() as i64 {
                 return trace_from(zero, verts0, verts1, idx, i1, -1, dir, out, isect_mir);
             } else {
                 out.push(p.isects[j0 as usize].xy.unwrap());
@@ -360,7 +360,7 @@ pub fn poly_union(poly0: &Polyline, poly1: &Polyline, self_isect_opt: Option<boo
                         verts1,
                         jdx,
                         k,
-                        (z - 1) as i32,
+                        (z - 1) as i64,
                         -1,
                         out,
                         isect_mir,
@@ -372,7 +372,7 @@ pub fn poly_union(poly0: &Polyline, poly1: &Polyline, self_isect_opt: Option<boo
                     verts1,
                     jdx,
                     k,
-                    (z + 1) as i32,
+                    (z + 1) as i64,
                     1,
                     out,
                     isect_mir,
@@ -403,7 +403,7 @@ pub fn poly_union(poly0: &Polyline, poly1: &Polyline, self_isect_opt: Option<boo
         }
     }
 
-    pub fn check_concavity(poly: &Polyline, idx: usize) -> i32 {
+    pub fn check_concavity(poly: &Polyline, idx: usize) -> i64 {
         let n = poly.len();
         let a = poly[(idx - 1 + n) % n];
         let b = poly[idx];
@@ -662,7 +662,7 @@ pub fn patternshade_shape(poly,step=5,pattern_func){
 }
 
 */
-pub fn vein_shape(poly: &Polyline, n_opt: Option<i32>) -> Vec<Polyline> {
+pub fn vein_shape(poly: &Polyline, n_opt: Option<i64>) -> Vec<Polyline> {
     let n = n_opt.unwrap_or(50);
     let bbox = get_boundingbox(poly);
     let mut out = vec![];
@@ -765,7 +765,7 @@ pub fn resample(polyline_slice: &[Point], step: f64) -> Vec<Point> {
         let rest = (n as f64 * step) / d;
         let rpx = a.0 * (1. - rest) + b.0 * rest;
         let rpy = a.1 * (1. - rest) + b.1 * rest;
-        for j in 1..n as i32 {
+        for j in 1..n as i64 {
             let t = j as f64 / n;
             let x = a.0 * (1. - t) + rpx * t;
             let y = a.1 * (1. - t) + rpy * t;
