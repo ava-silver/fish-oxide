@@ -106,18 +106,18 @@ F
   }
   return o;
 }
+*/
 
-
-pub fn fish_body_a(curve0,curve1,scale_scale,pattern_func){
-  let curve2 = [];
-  let curve3 = [];
+pub fn fish_body_a(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_func: Option<impl Fn(Point) -> f64>) -> Vec<Polyline>{
+  let mut curve2 = vec![];
+  let mut curve3 = vec![];
   for i in 0..curve0.len() {
-    curve2.push(lerp2d(...curve0[i],...curve1[i],0.95));
-    curve3.push(lerp2d(...curve0[i],...curve1[i],0.85));
+    curve2.push(lerp2d(curve0[i],curve1[i],0.95));
+    curve3.push(lerp2d(curve0[i],curve1[i],0.85));
   }
-  let outline1 = curve0.concat(curve1.slice().reverse());
-  let outline2 = curve0.concat(curve2.slice().reverse());
-  let outline3 = curve0.concat(curve3.slice().reverse());
+  let outline1 = curve0.into_iter().chain(curve1.clone().into_iter().rev()).collect();
+  let outline2 = curve0.into_iter().chain(curve2.clone().into_iter().rev()).collect();
+  let outline3 = curve0.into_iter().chain(curve3.clone().into_iter().rev()).collect();
 
   let bbox = get_boundingbox(curve0.concat(curve1));
   let m = !!(bbox.w/(scale_scale*15));
@@ -125,20 +125,25 @@ pub fn fish_body_a(curve0,curve1,scale_scale,pattern_func){
   let uw = bbox.w/m;
   let uh = bbox.h/n;
 
-  let pub fn = pattern_func?((x,y,w,h)=>squama(w,h,Number(pattern_func(x,y))*3)):((x,y,w,h)=>squama(w,h))
-  let sq = squama_mesh(m,n+3,uw,uh,pub fn,uw*3,uh*3,true).map(a=>trsl_poly(a,bbox.x,bbox.y-uh*1.5));
+    let funky = if let Some(funky_wunk) = pattern_func {
+        Box::new(|(x,y),(w,h)|squama(w,h,funky_wunk((x,y))*3)) 
+    } else {
+        Box::new(|(x,y),(w,h)|squama(w,h))
+    };
+  let sq = squama_mesh(m,n+3,uw,uh,funky,uw*3,uh*3,true).map(|a| trsl_poly(a,bbox.x,bbox.y-uh*1.5));
   let o0 = clip_multi(sq,outline2)[true];
   let o1 = clip_multi(o0,outline3);
-  o1.dont_clip = o1.dont_clip.filter(x=>rand()<0.6);
-  let o = [];
-  o.push(curve0,curve1.slice().reverse(),...o1.clip,...o1.dont_clip);
-  return o;
+  o1.dont_clip = o1.dont_clip.filter(|x| randf()<0.6);
+  let mut curve1_rev = curve1.clone();
+    
+    curve1_rev.reverse();
+  return vec![curve0.clone(), curve1_rev].into_iter().chain(o1.clip).chain(o1.dont_clip).collect();
 }
-
-pub fn fish_body_b(curve0,curve1,scale_scale,pattern_func){
-  let curve2 = [];
+/* 
+pub fn fish_body_b(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_func: Option<impl Fn(Point) -> f64>) -> Vec<Polyline>{
+  let mut curve2 = vec![];
   for i in 0..curve0.len() {
-    curve2.push(lerp2d(...curve0[i],...curve1[i],0.95));
+    curve2.push(lerp2d(curve0[i],curve1[i],0.95));
   }
   let outline1 = curve0.concat(curve1.slice().reverse());
   let outline2 = curve0.concat(curve2.slice().reverse());
@@ -149,7 +154,7 @@ pub fn fish_body_b(curve0,curve1,scale_scale,pattern_func){
   let uw = bbox.w/m;
   let uh = bbox.h/n;
 
-  let sq = squama_mesh(m,n+16,uw,uh,(x,y,w,h)=>squama(w*0.7,h*0.6,0),uw*8,uh*8,false).map(a=>trsl_poly(a,bbox.x,bbox.y-uh*8));
+  let sq = squama_mesh(m,n+16,uw,uh,|(x,y),(w,h)|squama(w*0.7,h*0.6,0),uw*8,uh*8,false).map(|a|trsl_poly(a,bbox.x,bbox.y-uh*8));
   let o0 = clip_multi(sq,outline2)[true];
 
   let o1 = [];
@@ -172,25 +177,26 @@ pub fn fish_body_b(curve0,curve1,scale_scale,pattern_func){
       }
     }
   }
-  let o = [];
-  o.push(curve0,curve1.slice().reverse(),...o1);
-  return o;
+  let mut curve1_rev = curve1.clone();
+    
+    curve1_rev.reverse();
+  return vec![curve0.clone(), curve1_rev].into_iter().chain(o1).collect();
 }
 
 
-pub fn ogee(x){
-  return 4 * f64::powf(x-0.5,3) + 0.5;
+pub fn ogee(x: f64) -> f64{
+  return 4. * f64::powf(x-0.5,3) + 0.5;
 }
 
-pub fn fish_body_c(curve0,curve1,scale_scale){
+pub fn fish_body_c(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_func: Option<impl Fn(Point) -> f64>) -> Vec<Polyline>{
   let step = 6*scale_scale;
 
   let curve2 = [];
   let curve3 = [];
 
   for i in 0..curve0.len() {
-    curve2.push(lerp2d(...curve0[i],...curve1[i],0.95));
-    curve3.push(lerp2d(...curve0[i],...curve1[i],0.4));
+    curve2.push(lerp2d(curve0[i],curve1[i],0.95));
+    curve3.push(lerp2d(curve0[i],curve1[i],0.4));
   }
   let outline1 = curve0.concat(curve1.slice().reverse());
   let outline2 = curve0.concat(curve2.slice().reverse());
@@ -203,14 +209,21 @@ pub fn fish_body_c(curve0,curve1,scale_scale){
 
   let lines = [curve3.reverse()];
 
-  for i in -bbox.h; i < bbox.w; i+=step){
+  for i in successors(Some(-bbox.h), |i| {
+        let next = i + step;
+        (next < bbox.w).then_some(next)
+    }){
     let x0 = bbox.x + i;
     let y0 = bbox.y;
     let x1 = bbox.x + i + bbox.h;
     let y1 = bbox.y + bbox.h;
     lines.push([[x0,y0],[x1,y1]]);
   }
-  for i in 0..bbox.w+bbox.h; i+=step){
+
+  for i in   successors(Some(0.), |i| {
+        let next = i + step;
+        (next < bbox.w+bbox.h).then_some(next)
+    }){
     let x0 = bbox.x + i;
     let y0 = bbox.y;
     let x1 = bbox.x + i - bbox.h;
@@ -219,7 +232,7 @@ pub fn fish_body_c(curve0,curve1,scale_scale){
   }
   for i in 0..lines.len() {
     lines[i] = resample(lines[i],4);
-    for j in 0;j < lines[i].len(); j++){
+    for j in 0..lines[i].len(){
       let [x,y] = lines[i][j];
       let t = (y-bbox.y)/bbox.h;
       let y1 = -Math.cos(t*PI)*bbox.h/2+bbox.y+bbox.h/2;
@@ -243,7 +256,7 @@ pub fn fish_body_c(curve0,curve1,scale_scale){
   return o;
 }
 
-pub fn fish_body_d(curve0,curve1,scale_scale){
+pub fn fish_body_d(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_func: Option<impl Fn(Point) -> f64>) -> Vec<Polyline>{
   let curve2 = [];
   for i in 0..curve0.len() {
     curve2.push(lerp2d(...curve0[i],...curve1[i],0.4));
@@ -288,19 +301,23 @@ pub fn fish_body_d(curve0,curve1,scale_scale){
 }
 
 
+*/
 
-
-pub fn fin_a(curve,ang0,ang1,func,clip_root=false,curvature0=0,curvature1=0,softness=10){
+pub fn fin_a(curve: &Polyline,ang0: f64,ang1: f64,func: fn(f64) -> f64,clip_root_opt: Option<bool>,curvature0_opt: Option<f64>,curvature1_opt: Option<f64>,softness_opt: Option<f64>){
+let clip_root = clip_root_opt.unwrap_or(false);
+let curvature0 = curvature0_opt.unwrap_or(0.);
+let curvature1 = curvature1_opt.unwrap_or(0.);
+let softness = softness_opt.unwrap_or(10.);
   let angs = [];
   for i in 0..curve.len() {
 
     if (i == 0){
-      angs.push( Math.atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]) - PI/2 );
+      angs.push( f64::atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]) - PI/2 );
     }else if (i == curve.len()-1){
-      angs.push( Math.atan2(curve[i][1]-curve[i-1][1], curve[i][0]-curve[i-1][0]) - PI/2 );
+      angs.push( f64::atan2(curve[i][1]-curve[i-1][1], curve[i][0]-curve[i-1][0]) - PI/2 );
     }else{
-      let a0 = Math.atan2(curve[i-1][1]-curve[i][1], curve[i-1][0]-curve[i][0]);
-      let a1 = Math.atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]);
+      let a0 = f64::atan2(curve[i-1][1]-curve[i][1], curve[i-1][0]-curve[i][0]);
+      let a1 = f64::atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]);
       while (a1 > a0){
         a1 -= PI*2;
       }
@@ -320,16 +337,16 @@ pub fn fin_a(curve,ang0,ang1,func,clip_root=false,curvature0=0,curvature1=0,soft
     let w = func(t);
 
     let [x0,y0] = curve[i];
-    let x1 = x0 + Math.cos(a)*w;
+    let x1 = x0 + f64::cos(a)*w;
     let y1 = y0 + f64::sin(a)*w;
 
     let p = resample([[x0,y0],[x1,y1]],3);
-    for j in 0..p.len(); j++){
+    for j in 0..p.len(){
       let s = j/(p.len()-1);
-      let ss = Math.sqrt(s);
+      let ss = f64::sqrt(s);
       let [x,y] = p[j];
       let cv = lerp(curvature0,curvature1,t)*f64::sin(s*PI);
-      p[j][0] += noise(x*0.1,y*0.1,3)*ss*softness + Math.cos(a-PI/2)*cv;
+      p[j][0] += noise(x*0.1,y*0.1,3)*ss*softness + f64::cos(a-PI/2)*cv;
       p[j][1] += noise(x*0.1,y*0.1,4)*ss*softness + f64::sin(a-PI/2)*cv;
     }
     if (i == 0){
@@ -339,7 +356,7 @@ pub fn fin_a(curve,ang0,ang1,func,clip_root=false,curvature0=0,curvature1=0,soft
     }else{
       out0.push(p[p.len()-1]);
       // if (i % 2){
-        let q = p.slice(clip_root?(   !!(rand()*4)  ):0,Math.max(2,!!(p.len()*(rand()*0.5+0.5))));
+        let q = p.slice(if clip_root {   (rand()*4) } else {0},f64::max(2,!!(p.len()*(rand()*0.5+0.5))));
         if (q.len()){
           out1.push(q);
         }
@@ -358,17 +375,18 @@ pub fn fin_a(curve,ang0,ang1,func,clip_root=false,curvature0=0,curvature1=0,soft
 }
 
 
-pub fn fin_b(curve,ang0,ang1,func,dark=1){
+pub fn fin_b(curve: &Polyline,ang0: f64,ang1: f64,func: fn(f64) -> f64, dark_opt: Option<f64>){
+    let dark = dark_opt.unwrap_or(1.);
   let angs = [];
   for i in 0..curve.len() {
 
     if (i == 0){
-      angs.push( Math.atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]) - PI/2 );
+      angs.push( f64::atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]) - PI/2 );
     }else if (i == curve.len()-1){
-      angs.push( Math.atan2(curve[i][1]-curve[i-1][1], curve[i][0]-curve[i-1][0]) - PI/2 );
+      angs.push( f64::atan2(curve[i][1]-curve[i-1][1], curve[i][0]-curve[i-1][0]) - PI/2 );
     }else{
-      let a0 = Math.atan2(curve[i-1][1]-curve[i][1], curve[i-1][0]-curve[i][0]);
-      let a1 = Math.atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]);
+      let a0 = f64::atan2(curve[i-1][1]-curve[i][1], curve[i-1][0]-curve[i][0]);
+      let a1 = f64::atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]);
       while (a1 > a0){
         a1 -= PI*2;
       }
@@ -389,24 +407,24 @@ pub fn fin_b(curve,ang0,ang1,func,dark=1){
     let w = func(t);
 
     let [x0,y0] = curve[i];
-    let x1 = x0 + Math.cos(a)*w;
+    let x1 = x0 + f64::cos(a)*w;
     let y1 = y0 + f64::sin(a)*w;
 
     let b = [
-      x1 + 0.5 * Math.cos(a-PI/2),
+      x1 + 0.5 * f64::cos(a-PI/2),
       y1 + 0.5 * f64::sin(a-PI/2),
     ];
     let c = [
-      x1 + 0.5 * Math.cos(a+PI/2),
+      x1 + 0.5 * f64::cos(a+PI/2),
       y1 + 0.5 * f64::sin(a+PI/2),
     ];
 
     let p = [
-      curve[i][0] + 1.8 * Math.cos(a-PI/2),
+      curve[i][0] + 1.8 * f64::cos(a-PI/2),
       curve[i][1] + 1.8 * f64::sin(a-PI/2),
     ];
     let q = [
-      curve[i][0] + 1.8 * Math.cos(a+PI/2),
+      curve[i][0] + 1.8 * f64::cos(a+PI/2),
       curve[i][1] + 1.8 * f64::sin(a+PI/2),
     ];
     out1.push([x1,y1]);
@@ -423,14 +441,14 @@ pub fn fin_b(curve,ang0,ang1,func,dark=1){
     let c = lerp2d(...a1,...p1,0.1);
 
     let o = [];
-    let ang = Math.atan2(c[1]-b[1],c[0]-b[0]);
+    let ang = f64::atan2(c[1]-b[1],c[0]-b[0]);
 
     for j in 0..n; j++){
       let t = j/(n-1);
       let d = f64::sin(t*PI)*2;
       let a = lerp2d(...b,...c,t);
       o.push([
-        a[0] + Math.cos(ang+PI/2)*d,
+        a[0] + f64::cos(ang+PI/2)*d,
         a[1] + f64::sin(ang+PI/2)*d,
       ])
     }
@@ -438,7 +456,7 @@ pub fn fin_b(curve,ang0,ang1,func,dark=1){
     // out2.push([b,c]);
     out2.push(o);
 
-    let m = !!( Math.min(dist(...a0,...q0),dist(...a1,...p1) ) /10 * dark);
+    let m = !!( f64::min(dist(...a0,...q0),dist(...a1,...p1) ) /10 * dark);
     let e = lerp2d(...curve[i],...curve[i+1],0.5);
     for k in 0; k < m; k ++){
       let p = [];
@@ -1065,7 +1083,7 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
     }
     let mut outline = curve0.clone();
     outline.extend(curve1.clone().into_iter().rev());
-    let sh = todo!("shade_shape(outline,8,-12,-12)");
+    let sh = shade_shape(&outline, Some(8.), Some(-12.), Some(-12.));
 
     let mut pattern_func: Option<Box<dyn Fn(f64, f64) -> bool>> = None;
     if (arg.pattern_type == 0) {
@@ -1090,13 +1108,13 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
 
     let bd;
     if (arg.scale_type == 0) {
-        bd = todo!("fish_body_a(curve0,curve1,arg.scale_scale,pattern_func)");
+        bd = fish_body_a(curve0, curve1, arg.scale_scale, pattern_func);
     } else if (arg.scale_type == 1) {
-        bd = todo!("fish_body_b(curve0,curve1,arg.scale_scale,pattern_func)");
+        bd = fish_body_b(curve0, curve1, arg.scale_scale, pattern_func);
     } else if (arg.scale_type == 2) {
-        bd = todo!("fish_body_c(curve0,curve1,arg.scale_scale)");
+        bd = fish_body_c(curve0, curve1, arg.scale_scale);
     } else if (arg.scale_type == 3) {
-        bd = todo!("fish_body_d(curve0,curve1,arg.scale_scale)");
+        bd = fish_body_d(curve0, curve1, arg.scale_scale);
     }
 
     let mut f0_func: Box<dyn Fn(f64) -> f64>;
