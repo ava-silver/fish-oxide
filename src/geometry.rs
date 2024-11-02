@@ -611,18 +611,22 @@ pub fn shade_shape(
     lines
 }
 
-pub fn fill_shape(poly: &Polyline, step_opt: Option<usize>) -> Vec<Vec<(f64, f64)>> {
-    let step = step_opt.unwrap_or(5);
+pub fn fill_shape(poly: &Polyline, step_opt: Option<f64>) -> Vec<Vec<(f64, f64)>> {
+    let step = step_opt.unwrap_or(5.);
     let mut bbox = get_boundingbox(poly);
     bbox.x -= step as f64;
     bbox.y -= step as f64;
     bbox.w += step as f64 * 2.;
     bbox.h += step as f64 * 2.;
     let mut lines = vec![];
-    for i in (0..(bbox.w + bbox.h) as usize / 2).step_by(step) {
-        let x0 = bbox.x + i as f64;
+
+    for i in successors(Some(0.), |i| {
+        let next = i + step;
+        (next < bbox.w + bbox.h / 2.).then_some(next)
+    }) {
+        let x0 = bbox.x + i;
         let y0 = bbox.y;
-        let x1 = bbox.x + i as f64 - bbox.h / 2.;
+        let x1 = bbox.x + i - bbox.h / 2.;
         let y1 = bbox.y + bbox.h;
         lines.push(vec![(x0, y0), (x1, y1)]);
     }

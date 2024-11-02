@@ -1,10 +1,10 @@
-use std::f64::consts::PI;
+use std::f64::consts::{E, PI};
 
 use crate::{
     custom_rand::{deviate, noise, rand},
     geometry::{
-        clip, clip_multi, dist, get_boundingbox, lerp, lerp2d, poly_union, pt_seg_dist, resample,
-        shade_shape, trsl_poly, Point, Polyline,
+        clip, clip_multi, dist, fill_shape, get_boundingbox, lerp, lerp2d, poly_union, pt_seg_dist,
+        resample, shade_shape, trsl_poly, Point, Polyline,
     },
     hershey::compile_hershey,
     params::Params,
@@ -637,92 +637,96 @@ pub fn fish_jaw(x0,y0,x1,y1,x2,y2){
   return [[[x2,y2],[x1,y1],[x0,y0]],[o,...vein_shape(o,5)]];
 }
 
-
-pub fn fish_eye_a(ex,ey,rad){
-  let n = 20;
-  let eye0 = [];
-  let eye1 = [];
-  let eye2 = [];
-  for i in 0..n {
-    let t = i/(n-1);
-    let a = t * PI*2 + PI/4*3;
-    eye0.push([
-      ex + Math.cos(a)*rad,
-      ey + f64::sin(a)*rad
-    ]);
-    if (t > 0.5){
-      eye1.push([
-        ex + Math.cos(a)*(rad*0.8),
-        ey + f64::sin(a)*(rad*0.8)
-      ]);
-    }
-    eye2.push([
-      ex + Math.cos(a)*(rad*0.4) -0.75,
-      ey + f64::sin(a)*(rad*0.4) -0.75
-    ]);
-  }
-
-  let ef = shade_shape(eye2,2.7,10,10);
-  return [eye0,[eye0,eye1,eye2,...ef]];
-}
-
-pub fn fish_eye_b(ex,ey,rad){
-  let n = 20;
-  let eye0 = [];
-  let eye1 = [];
-  let eye2 = [];
-  for i in 0..n {
-    let t = i/(n-1);
-    let a = t * PI*2+E;
-    eye0.push([
-      ex + Math.cos(a)*rad,
-      ey + f64::sin(a)*rad
-    ]);
-    eye2.push([
-      ex + Math.cos(a)*(rad*0.4),
-      ey + f64::sin(a)*(rad*0.4)
-    ]);
-  }
-  let m =!!((rad*0.6)/2);
-  for i in 0..m {
-    let r = rad - i * 2;
-    let e = [];
-    for i in 0..n {
-      let t = i/(n-1);
-      let a = lerp(PI*7/8,PI*13/8,t)
-      e.push([
-        ex + Math.cos(a)*r,
-        ey + f64::sin(a)*r
-      ]);
-
-    }
-    eye1.push(e);
-  }
-  let trig = [
-    [ex+Math.cos(-PI*3/4)*(rad*0.9),ey+f64::sin(-PI*3/4)*(rad*0.9)],
-    [ex+1,ey+1],
-    [ex+Math.cos(-PI*11/12)*(rad*0.9),ey+f64::sin(-PI*11/12)*(rad*0.9)],
-  ];
-  trig = resample(trig,3);
-  for i in 0..trig.len() {
-    let [x,y] = trig[i];
-    x += noise(x*0.1,y*0.1,22)*4-2;
-    y += noise(x*0.1,y*0.1,33)*4-2;
-    trig[i] = [x,y];
-  }
-
-
-  let ef = fill_shape(eye2,1.5);
-
-  ef = clip_multi(ef,trig).dont_clip;
-  eye1 = clip_multi(eye1,trig).dont_clip;
-  eye2 = clip(eye2,trig).dont_clip;
-
-  return [eye0,[eye0,...eye1,...eye2,...ef]];
-}
-
-
 */
+
+pub fn fish_eye_a(ex: f64, ey: f64, rad: f64) -> (Polyline, Vec<Polyline>) {
+    let n = 20;
+    let mut eye0 = vec![];
+    let mut eye1 = vec![];
+    let mut eye2 = vec![];
+    for i in 0..n {
+        let t = i as f64 / (n as f64 - 1.);
+        let a = t * PI * 2. + PI / 4. * 3.;
+        eye0.push((ex + f64::cos(a) * rad, ey + f64::sin(a) * rad));
+        if (t > 0.5) {
+            eye1.push((
+                ex + f64::cos(a) * (rad * 0.8),
+                ey + f64::sin(a) * (rad * 0.8),
+            ));
+        }
+        eye2.push((
+            ex + f64::cos(a) * (rad * 0.4) - 0.75,
+            ey + f64::sin(a) * (rad * 0.4) - 0.75,
+        ));
+    }
+
+    let ef = shade_shape(&eye2, Some(2.7), Some(10.), Some(10.));
+    return (
+        eye0.clone(),
+        [eye0, eye1, eye2].into_iter().chain(ef).collect(),
+    );
+}
+
+pub fn fish_eye_b(ex: f64, ey: f64, rad: f64) -> (Polyline, Vec<Polyline>) {
+    let n = 20;
+    let mut eye0 = vec![];
+    let mut eye1 = vec![];
+    let mut eye2 = vec![];
+    for i in 0..n {
+        let t = i as f64 / (n as f64 - 1.);
+        let a = t * PI * 2. + E;
+        eye0.push((ex + f64::cos(a) * rad, ey + f64::sin(a) * rad));
+        eye2.push((
+            ex + f64::cos(a) * (rad * 0.4),
+            ey + f64::sin(a) * (rad * 0.4),
+        ));
+    }
+    let m = ((rad * 0.6) / 2.).trunc() as usize;
+    for i in 0..m {
+        let r = rad - i as f64 * 2.;
+        let mut e = vec![];
+        for i in 0..n {
+            let t = i as f64 / (n as f64 - 1.);
+            let a = lerp(PI * 7. / 8., PI * 13. / 8., t);
+            e.push((ex + f64::cos(a) * r, ey + f64::sin(a) * r));
+        }
+        eye1.push(e);
+    }
+    let mut trig = vec![
+        (
+            ex + f64::cos(-PI * 3. / 4.) * (rad * 0.9),
+            ey + f64::sin(-PI * 3. / 4.) * (rad * 0.9),
+        ),
+        (ex + 1., ey + 1.),
+        (
+            ex + f64::cos(-PI * 11. / 12.) * (rad * 0.9),
+            ey + f64::sin(-PI * 11. / 12.) * (rad * 0.9),
+        ),
+    ];
+    trig = resample(&trig, 3.);
+    for i in 0..trig.len() {
+        let (mut x, mut y) = trig[i];
+        x += noise(x * 0.1, Some(y * 0.1), Some(22.)) * 4. - 2.;
+        y += noise(x * 0.1, Some(y * 0.1), Some(33.)) * 4. - 2.;
+        trig[i] = (x, y);
+    }
+
+    let mut ef = fill_shape(&eye2, Some(1.5));
+
+    ef = clip_multi(&ef, &trig, None).dont_clip;
+    eye1 = clip_multi(&eye1, &trig, None).dont_clip;
+    let eye2_clip = clip(&eye2, &trig).dont_clip;
+
+    return (
+        eye0.clone(),
+        vec![eye0]
+            .into_iter()
+            .chain(eye1)
+            .chain(eye2_clip)
+            .chain(ef)
+            .collect(),
+    );
+}
 
 pub fn barbel((mut x, mut y): Point, n: usize, mut ang: f64, dd_opt: Option<f64>) -> Polyline {
     let dd = dd_opt.unwrap_or(3.);
@@ -862,7 +866,7 @@ pub fn fish_head(
         jaw_pt0.1 + f64::sin(jaw_ang) * jaw_l,
     );
 
-    let [eye0, ef] = (if arg.eye_type != 0 {
+    let (eye0, ef) = (if arg.eye_type != 0 {
         fish_eye_b(ex, ey, arg.eye_size)
     } else {
         fish_eye_a(ex, ey, arg.eye_size)
@@ -890,9 +894,9 @@ pub fn fish_head(
         teeth1s = clip_multi(&teeth1, &lip1, None).dont_clip;
     }
 
-    let olines = clip(&outline, lip0).dont_clip;
+    let olines = clip(&outline, &lip0).dont_clip;
 
-    let lip0s = clip(lip0, lip1).dont_clip;
+    let lip0s = clip(&lip0, &lip1).dont_clip;
 
     let sh = shade_shape(&outline, Some(6.), Some(-6.), Some(-6.));
     sh = clip_multi(&sh, &lip0, None).dont_clip;
