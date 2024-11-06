@@ -3,8 +3,7 @@ use std::f64::consts::{E, PI};
 use crate::{
     custom_rand::{deviate, noise, rand, randf},
     geometry::{
-        clip, clip_multi, dist, fill_shape, get_boundingbox, lerp, lerp2d, poly_union, pt_seg_dist,
-        resample, shade_shape, trsl_poly, vein_shape, Point, Polyline,
+        binclip_multi, clip, clip_multi, dist, fill_shape, get_boundingbox, lerp, lerp2d, poly_union, pt_seg_dist, resample, shade_shape, squama, trsl_poly, vein_shape, Point, Polyline
     },
     hershey::compile_hershey,
     params::Params,
@@ -34,9 +33,9 @@ pub pub fn draw_svg_anim(polylines,speed){
   for (let i = 0; i < polylines.length; i++){
     let l = 0;
     for (let j = 1; j < polylines[i].length; j++){
-      l += Math.hypot(
-        polylines[i][j-1][0]-polylines[i][j][0],
-        polylines[i][j-1][1]-polylines[i][j][1]
+      l += f64::hypot(
+        polylines[i][j-1].0-polylines[i][j].0,
+        polylines[i][j-1].1-polylines[i][j].1
       );
     }
     lengths.push(l);
@@ -108,38 +107,60 @@ F
 }
 */
 
-pub fn fish_body_a(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_func: Option<impl Fn(Point) -> f64>) -> Vec<Polyline>{
-  let mut curve2 = vec![];
-  let mut curve3 = vec![];
-  for i in 0..curve0.len() {
-    curve2.push(lerp2d(curve0[i],curve1[i],0.95));
-    curve3.push(lerp2d(curve0[i],curve1[i],0.85));
-  }
-  let outline1 = curve0.into_iter().chain(curve1.clone().into_iter().rev()).collect();
-  let outline2 = curve0.into_iter().chain(curve2.clone().into_iter().rev()).collect();
-  let outline3 = curve0.into_iter().chain(curve3.clone().into_iter().rev()).collect();
+pub fn fish_body_a(
+    curve0: &Polyline,
+    curve1: &Polyline,
+    scale_scale: f64,
+    pattern_func: Option<impl Fn(Point) -> f64>,
+) -> Vec<Polyline> {
+    let mut curve2 = vec![];
+    let mut curve3 = vec![];
+    for i in 0..curve0.len() {
+        curve2.push(lerp2d(curve0[i], curve1[i], 0.95));
+        curve3.push(lerp2d(curve0[i], curve1[i], 0.85));
+    }
+    let outline1 = curve0
+        .clone()
+        .into_iter()
+        .chain(curve1.clone().into_iter().rev())
+        .collect();
+    let outline2 = curve0
+        .clone()
+        .into_iter()
+        .chain(curve2.clone().into_iter().rev())
+        .collect();
+    let outline3 = curve0
+        .clone()
+        .into_iter()
+        .chain(curve3.clone().into_iter().rev())
+        .collect();
 
-  let bbox = get_boundingbox(curve0.concat(curve1));
-  let m = !!(bbox.w/(scale_scale*15));
-  let n = !!(bbox.h/(scale_scale*15));
-  let uw = bbox.w/m;
-  let uh = bbox.h/n;
+    let bbox = get_boundingbox(&curve0.clone().into_iter().chain(curve1.clone()).collect());
+    let m = (bbox.w / (scale_scale * 15.)).trunc();
+    let n = (bbox.h / (scale_scale * 15.)).trunc();
+    let uw = bbox.w / m;
+    let uh = bbox.h / n;
 
-    let funky = if let Some(funky_wunk) = pattern_func {
-        Box::new(|(x,y),(w,h)|squama(w,h,funky_wunk((x,y))*3)) 
+    let funky: Box<dyn Fn(Point, Point) -> Vec<Polyline>> = if let Some(funky_wunk) = pattern_func {
+        Box::new(|(x, y), (w, h)| squama(w, h, Some(funky_wunk((x, y)) as usize * 3)))
     } else {
-        Box::new(|(x,y),(w,h)|squama(w,h))
+        Box::new(|(x, y), (w, h)| squama(w, h, None))
     };
-  let sq = squama_mesh(m,n+3,uw,uh,funky,uw*3,uh*3,true).map(|a| trsl_poly(a,bbox.x,bbox.y-uh*1.5));
-  let o0 = clip_multi(sq,outline2)[true];
-  let o1 = clip_multi(o0,outline3);
-  o1.dont_clip = o1.dont_clip.filter(|x| randf()<0.6);
-  let mut curve1_rev = curve1.clone();
-    
+    let sq = squama_mesh(m, n + 3, uw, uh, funky, uw * 3, uh * 3, true)
+        .map(|a| trsl_poly(a, bbox.x, bbox.y - uh * 1.5));
+    let o0 = clip_multi(&sq, &outline2).clip;
+    let o1 = clip_multi(&o0, &outline3);
+    o1.dont_clip = o1.dont_clip.into_iter().filter(|x| randf() < 0.6).collect();
+    let mut curve1_rev = curve1.clone();
+
     curve1_rev.reverse();
-  return vec![curve0.clone(), curve1_rev].into_iter().chain(o1.clip).chain(o1.dont_clip).collect();
+    return vec![curve0.clone(), curve1_rev]
+        .into_iter()
+        .chain(o1.clip)
+        .chain(o1.dont_clip)
+        .collect();
 }
-/* 
+/*
 pub fn fish_body_b(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_func: Option<impl Fn(Point) -> f64>) -> Vec<Polyline>{
   let mut curve2 = vec![];
   for i in 0..curve0.len() {
@@ -159,7 +180,7 @@ pub fn fish_body_b(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_
 
   let o1 = [];
   for i in 0..o0.len() {
-    let [x,y] = o0[i][0];
+    let [x,y] = o0[i].0;
     let t = (y-bbox.y)/bbox.h;
     // if (rand() > t){
     //   o1.push(o0[i]);
@@ -178,7 +199,7 @@ pub fn fish_body_b(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_
     }
   }
   let mut curve1_rev = curve1.clone();
-    
+
     curve1_rev.reverse();
   return vec![curve0.clone(), curve1_rev].into_iter().chain(o1).collect();
 }
@@ -240,8 +261,8 @@ pub fn fish_body_c(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_
       let dx = (noise(x*0.005,y1*0.005,0.1)-0.5)*50;
       let dy = (noise(x*0.005,y1*0.005,1.2)-0.5)*50;
 
-      lines[i][j][0] += dx;
-      lines[i][j][1] = y1 + dy;
+      lines[i][j].0 += dx;
+      lines[i][j].1 = y1 + dy;
     }
   }
 
@@ -283,8 +304,8 @@ pub fn fish_body_d(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_
       let [x,y] = o0[i][j];
       let dx = 30*(noise(x*0.01,y*0.01,-1)-0.5);
       let dy = 30*(noise(x*0.01,y*0.01,9)-0.5);
-      o0[i][j][0] += dx;
-      o0[i][j][1] += dy;
+      o0[i][j].0 += dx;
+      o0[i][j].1 += dy;
     }
 
     o1.push(...binclip(o0[i],(x,y,t)=>(
@@ -303,90 +324,106 @@ pub fn fish_body_d(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_
 
 */
 
-pub fn fin_a(curve: &Polyline,ang0: f64,ang1: f64,func: fn(f64) -> f64,clip_root_opt: Option<bool>,curvature0_opt: Option<f64>,curvature1_opt: Option<f64>,softness_opt: Option<f64>){
-let clip_root = clip_root_opt.unwrap_or(false);
-let curvature0 = curvature0_opt.unwrap_or(0.);
-let curvature1 = curvature1_opt.unwrap_or(0.);
-let softness = softness_opt.unwrap_or(10.);
-  let angs = [];
-  for i in 0..curve.len() {
-
-    if (i == 0){
-      angs.push( f64::atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]) - PI/2 );
-    }else if (i == curve.len()-1){
-      angs.push( f64::atan2(curve[i][1]-curve[i-1][1], curve[i][0]-curve[i-1][0]) - PI/2 );
-    }else{
-      let a0 = f64::atan2(curve[i-1][1]-curve[i][1], curve[i-1][0]-curve[i][0]);
-      let a1 = f64::atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]);
-      while (a1 > a0){
-        a1 -= PI*2;
-      }
-      a1 += PI*2;
-      let a = (a0+a1)/2;
-      angs.push(a);
-    }
-  }
-  let out0 = [];
-  let out1 = [];
-  let out2 = [];
-  let out3 = [];
-  for i in 0..curve.len() {
-    let t = i/(curve.len()-1);
-    let aa = lerp(ang0,ang1,t);
-    let a = angs[i]+aa;
-    let w = func(t);
-
-    let [x0,y0] = curve[i];
-    let x1 = x0 + f64::cos(a)*w;
-    let y1 = y0 + f64::sin(a)*w;
-
-    let p = resample([[x0,y0],[x1,y1]],3);
-    for j in 0..p.len(){
-      let s = j/(p.len()-1);
-      let ss = f64::sqrt(s);
-      let [x,y] = p[j];
-      let cv = lerp(curvature0,curvature1,t)*f64::sin(s*PI);
-      p[j][0] += noise(x*0.1,y*0.1,3)*ss*softness + f64::cos(a-PI/2)*cv;
-      p[j][1] += noise(x*0.1,y*0.1,4)*ss*softness + f64::sin(a-PI/2)*cv;
-    }
-    if (i == 0){
-      out2 = p;
-    }else if (i == curve.len()-1){
-      out3 = p.slice().reverse();
-    }else{
-      out0.push(p[p.len()-1]);
-      // if (i % 2){
-        let q = p.slice(if clip_root {   (rand()*4) } else {0},f64::max(2,!!(p.len()*(rand()*0.5+0.5))));
-        if (q.len()){
-          out1.push(q);
+pub fn fin_a(
+    curve: &Polyline,
+    ang0: f64,
+    ang1: f64,
+    func: fn(f64) -> f64,
+    clip_root_opt: Option<bool>,
+    curvature0_opt: Option<f64>,
+    curvature1_opt: Option<f64>,
+    softness_opt: Option<f64>,
+) {
+    let clip_root = clip_root_opt.unwrap_or(false);
+    let curvature0 = curvature0_opt.unwrap_or(0.);
+    let curvature1 = curvature1_opt.unwrap_or(0.);
+    let softness = softness_opt.unwrap_or(10.);
+    let mut angs = vec![];
+    for i in 0..curve.len() {
+        if (i == 0) {
+            angs.push(
+                f64::atan2(curve[i + 1].1 - curve[i].1, curve[i + 1].0 - curve[i].0) - PI / 2.,
+            );
+        } else if (i == curve.len() - 1) {
+            angs.push(
+                f64::atan2(curve[i].1 - curve[i - 1].1, curve[i].0 - curve[i - 1].0) - PI / 2.,
+            );
+        } else {
+            let a0 = f64::atan2(curve[i - 1].1 - curve[i].1, curve[i - 1].0 - curve[i].0);
+            let a1 = f64::atan2(curve[i + 1].1 - curve[i].1, curve[i + 1].0 - curve[i].0);
+            while (a1 > a0) {
+                a1 -= PI * 2.;
+            }
+            a1 += PI * 2.;
+            let a = (a0 + a1) / 2.;
+            angs.push(a);
         }
-      // }
     }
-  }
-  out0 = resample(out0,3);
-  for i in 0..out0.len() {
-    let [x,y] = out0[i];
-    out0[i][0] += (noise(x*0.1,y*0.1)*6-3)*(softness/10);
-    out0[i][1] += (noise(x*0.1,y*0.1)*6-3)*(softness/10);
-  }
-  let o = out2.concat(out0).concat(out3);
-  out1.unshift(o);
-  return [o.concat(curve.slice().reverse()),out1];
+    let mut out0 = vec![];
+    let mut out1 = vec![];
+    let mut out2 = vec![];
+    let mut out3 = vec![];
+    for i in 0..curve.len() {
+        let t = i as f64 / (curve.len() - 1) as f64;
+        let aa = lerp(ang0, ang1, t);
+        let a = angs[i] + aa;
+        let w = func(t);
+
+        let (x0, y0) = curve[i];
+        let x1 = x0 + f64::cos(a) * w;
+        let y1 = y0 + f64::sin(a) * w;
+
+        let p = resample(&[(x0, y0), (x1, y1)], 3.);
+        for j in 0..p.len() {
+            let s = j as f64 / (p.len() - 1) as f64;
+            let ss = f64::sqrt(s);
+            let (x, y) = p[j];
+            let cv = lerp(curvature0, curvature1, t) * f64::sin(s * PI);
+            p[j].0 += noise(x * 0.1, Some(y * 0.1), Some(3.)) * ss * softness
+                + f64::cos(a - PI / 2.) * cv;
+            p[j].1 += noise(x * 0.1, Some(y * 0.1), Some(4.)) * ss * softness
+                + f64::sin(a - PI / 2.) * cv;
+        }
+        if (i == 0) {
+            out2 = p;
+        } else if (i == curve.len() - 1) {
+            out3 = p.clone();
+            out3.reverse();
+        } else {
+            out0.push(p[p.len() - 1]);
+            // if (i % 2){
+            let q = &p[(if clip_root { (rand() * 4) as usize } else { 0 })
+                ..(2.max((p.len() as f64 * (randf() * 0.5 + 0.5)) as usize))];
+            if (!q.is_empty()) {
+                out1.push(q);
+            }
+            // }
+        }
+    }
+    out0 = resample(&out0, 3.);
+    for i in 0..out0.len() {
+        let [x, y] = out0[i];
+        out0[i].0 += (noise(x * 0.1, y * 0.1) * 6 - 3) * (softness / 10);
+        out0[i].1 += (noise(x * 0.1, y * 0.1) * 6 - 3) * (softness / 10);
+    }
+    let o = out2.concat(out0).concat(out3);
+    out1.unshift(o);
+    return [o.concat(curve.slice().reverse()), out1];
 }
 
-
+/*
 pub fn fin_b(curve: &Polyline,ang0: f64,ang1: f64,func: fn(f64) -> f64, dark_opt: Option<f64>){
     let dark = dark_opt.unwrap_or(1.);
   let angs = [];
   for i in 0..curve.len() {
 
     if (i == 0){
-      angs.push( f64::atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]) - PI/2 );
+      angs.push( f64::atan2(curve[i+1].1-curve[i].1, curve[i+1].0-curve[i].0) - PI/2 );
     }else if (i == curve.len()-1){
-      angs.push( f64::atan2(curve[i][1]-curve[i-1][1], curve[i][0]-curve[i-1][0]) - PI/2 );
+      angs.push( f64::atan2(curve[i].1-curve[i-1].1, curve[i].0-curve[i-1].0) - PI/2 );
     }else{
-      let a0 = f64::atan2(curve[i-1][1]-curve[i][1], curve[i-1][0]-curve[i][0]);
-      let a1 = f64::atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]);
+      let a0 = f64::atan2(curve[i-1].1-curve[i].1, curve[i-1].0-curve[i].0);
+      let a1 = f64::atan2(curve[i+1].1-curve[i].1, curve[i+1].0-curve[i].0);
       while (a1 > a0){
         a1 -= PI*2;
       }
@@ -420,12 +457,12 @@ pub fn fin_b(curve: &Polyline,ang0: f64,ang1: f64,func: fn(f64) -> f64, dark_opt
     ];
 
     let p = [
-      curve[i][0] + 1.8 * f64::cos(a-PI/2),
-      curve[i][1] + 1.8 * f64::sin(a-PI/2),
+      curve[i].0 + 1.8 * f64::cos(a-PI/2),
+      curve[i].1 + 1.8 * f64::sin(a-PI/2),
     ];
     let q = [
-      curve[i][0] + 1.8 * f64::cos(a+PI/2),
-      curve[i][1] + 1.8 * f64::sin(a+PI/2),
+      curve[i].0 + 1.8 * f64::cos(a+PI/2),
+      curve[i].1 + 1.8 * f64::sin(a+PI/2),
     ];
     out1.push([x1,y1]);
     out0.push([p,b,c,q]);
@@ -441,15 +478,15 @@ pub fn fin_b(curve: &Polyline,ang0: f64,ang1: f64,func: fn(f64) -> f64, dark_opt
     let c = lerp2d(...a1,...p1,0.1);
 
     let o = [];
-    let ang = f64::atan2(c[1]-b[1],c[0]-b[0]);
+    let ang = f64::atan2(c.1-b.1,c.0-b.0);
 
     for j in 0..n; j++){
       let t = j/(n-1);
       let d = f64::sin(t*PI)*2;
       let a = lerp2d(...b,...c,t);
       o.push([
-        a[0] + f64::cos(ang+PI/2)*d,
-        a[1] + f64::sin(ang+PI/2)*d,
+        a.0 + f64::cos(ang+PI/2)*d,
+        a.1 + f64::sin(ang+PI/2)*d,
       ])
     }
 
@@ -470,8 +507,8 @@ pub fn fin_b(curve: &Polyline,ang0: f64,ang1: f64,func: fn(f64) -> f64, dark_opt
 
   let out4 = [];
   if (out0.len() > 1){
-    let clipper = out0[0];
-    out4.push(out0[0])
+    let clipper = out0.0;
+    out4.push(out0.0)
     for i in 1; i < out0.len() {
       out4.push(...clip(out0[i],clipper).dont_clip);
       clipper = poly_union(clipper,out0[i]);
@@ -480,96 +517,107 @@ pub fn fin_b(curve: &Polyline,ang0: f64,ang1: f64,func: fn(f64) -> f64, dark_opt
 
   return [out2.flat().concat(curve.slice().reverse()),out4.concat(out2).concat(out3)];
 }
-
-
-pub fn finlet(curve,h,dir=1){
-  let angs = [];
-  for i in 0..curve.len() {
-    if (i == 0){
-      angs.push( Math.atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]) - PI/2 );
-    }else if (i == curve.len()-1){
-      angs.push( Math.atan2(curve[i][1]-curve[i-1][1], curve[i][0]-curve[i-1][0]) - PI/2 );
-    }else{
-      let a0 = Math.atan2(curve[i-1][1]-curve[i][1], curve[i-1][0]-curve[i][0]);
-      let a1 = Math.atan2(curve[i+1][1]-curve[i][1], curve[i+1][0]-curve[i][0]);
-      while (a1 > a0){
-        a1 -= PI*2;
-      }
-      a1 += PI*2;
-      let a = (a0+a1)/2;
-      angs.push(a);
-    }
-  }
-  let out0 = [];
-  for i in 0..curve.len() {
-    let t = i/(curve.len()-1);
-    let a = angs[i];
-    let w = (i+1) % 3 ? 0 : h;
-    if (dir > 0){
-      w *= (1-t*0.5);
-    }else{
-      w *= 0.5 + t * 0.5
-    }
-
-    let [x0,y0] = curve[i];
-    let x1 = x0 + Math.cos(a)*w;
-    let y1 = y0 + f64::sin(a)*w;
-    out0.push([x1,y1]);
-
-  }
-  out0 = resample(out0,2);
-  for i in 0..out0.len() {
-    let [x,y] = out0[i];
-    out0[i][0] += noise(x*0.1,y*0.1)*2-3;
-    out0[i][1] += noise(x*0.1,y*0.1)*2-3;
-  }
-  out0.push(curve[curve.len()-1]);
-  return [out0.concat(curve.slice().reverse()),[out0]];
-}
-
-pub fn fin_adipose(curve,dx,dy,r){
-  let n = 20;
-  let [x0,y0] = curve[!!(curve.len()/2)];
-  let [x,y] = [x0+dx,y0+dy];
-  let [x1,y1] = curve[0];
-  let [x2,y2] = curve[curve.len()-1];
-  let d1 = dist(x,y,x1,y1);
-  let d2 = dist(x,y,x2,y2);
-  let a1 = Math.acos(r/d1);
-  let a2 = Math.acos(r/d2);
-  let a01 = Math.atan2(y1-y,x1-x)+a1;
-  let a02 = Math.atan2(y2-y,x2-x)-a2;
-  a02 -= PI*2;
-  while (a02 < a01){
-    a02 += PI*2;
-  }
-  let out0 = [[x1,y1]]
-  for i in 0..n {
-    let t = i/(n-1);
-    let a = lerp(a01,a02,t);
-    let p = [
-      x+Math.cos(a)*r,
-      y+f64::sin(a)*r,
-    ]
-    out0.push(p);
-  }
-  out0.push([x2,y2]);
-  out0 = resample(out0,3);
-  for i in 0..out0.len() {
-    let t = i/(out0.len()-1);
-    let s = f64::sin(t*PI);
-    let [x,y] = out0[i];
-    out0[i][0] += (noise(x*0.01,y*0.01)-0.5)*s*50;
-    out0[i][1] += (noise(x*0.01,y*0.01)-0.5)*s*50;
-  }
-  let cc = out0.concat(curve.slice().reverse());
-  let out1 = clip(trsl_poly(out0,0,4),cc).clip;
-
-  out1 = clip_multi(out1,(x,y,t)=>(rand()<f64::sin(t*PI)),binclip).clip;
-  return [cc,[out0,...out1]];
-
-}
 */
+
+pub fn finlet(curve: &Polyline, h: f64, dir_opt: Option<i32>) -> (Polyline, Vec<Polyline>) {
+    let dir = dir_opt.unwrap_or(1);
+    let mut angs = vec![];
+    for i in 0..curve.len() {
+        if (i == 0) {
+            angs.push(
+                f64::atan2(curve[i + 1].1 - curve[i].1, curve[i + 1].0 - curve[i].0) - PI / 2.,
+            );
+        } else if (i == curve.len() - 1) {
+            angs.push(
+                f64::atan2(curve[i].1 - curve[i - 1].1, curve[i].0 - curve[i - 1].0) - PI / 2.,
+            );
+        } else {
+            let a0 = f64::atan2(curve[i - 1].1 - curve[i].1, curve[i - 1].0 - curve[i].0);
+            let mut a1 = f64::atan2(curve[i + 1].1 - curve[i].1, curve[i + 1].0 - curve[i].0);
+            while (a1 > a0) {
+                a1 -= PI * 2.;
+            }
+            a1 += PI * 2.;
+            let a = (a0 + a1) / 2.;
+            angs.push(a);
+        }
+    }
+    let mut out0 = vec![];
+    for i in 0..curve.len() {
+        let t = i as f64 / (curve.len() - 1) as f64;
+        let a = angs[i];
+        let mut w = if (i + 1) % 3 != 0 { 0. } else { h };
+        if (dir > 0) {
+            w *= (1. - t * 0.5);
+        } else {
+            w *= 0.5 + t * 0.5
+        }
+
+        let (x0, y0) = curve[i];
+        let x1 = x0 + f64::cos(a) * w;
+        let y1 = y0 + f64::sin(a) * w;
+        out0.push((x1, y1));
+    }
+    out0 = resample(&out0, 2.);
+    for i in 0..out0.len() {
+        let (x, y) = out0[i];
+        out0[i].0 += noise(x * 0.1, Some(y * 0.1), None) * 2. - 3.;
+        out0[i].1 += noise(x * 0.1, Some(y * 0.1), None) * 2. - 3.;
+    }
+    out0.push(curve[curve.len() - 1]);
+    return (
+        out0.clone()
+            .into_iter()
+            .chain(curve.clone().into_iter().rev())
+            .collect(),
+        vec![out0],
+    );
+}
+
+pub fn fin_adipose(curve: &Polyline, dx: f64, dy: f64, r: f64) -> (Polyline, Vec<Polyline>) {
+    let n = 20;
+    let (x0, y0) = curve[(curve.len() / 2)];
+    let (x, y) = (x0 + dx, y0 + dy);
+    let (x1, y1) = curve.0;
+    let (x2, y2) = curve[curve.len() - 1];
+    let d1 = dist((x, y), (x1, y1));
+    let d2 = dist((x, y), (x2, y2));
+    let a1 = f64::acos(r / d1);
+    let a2 = f64::acos(r / d2);
+    let a01 = f64::atan2(y1 - y, x1 - x) + a1;
+    let mut a02 = f64::atan2(y2 - y, x2 - x) - a2;
+    a02 -= PI * 2.;
+    while (a02 < a01) {
+        a02 += PI * 2.;
+    }
+    let mut out0 = vec![(x1, y1)];
+    for i in 0..n {
+        let t = i as f64 / (n - 1) as f64;
+        let a = lerp(a01, a02, t);
+        let p = (x + f64::cos(a) * r, y + f64::sin(a) * r);
+        out0.push(p);
+    }
+    out0.push((x2, y2));
+    out0 = resample(&out0, 3.);
+    for i in 0..out0.len() {
+        let t = i as f64 / (out0.len() - 1) as f64;
+        let s = f64::sin(t * PI);
+        let (x, y) = out0[i];
+        out0[i].0 += (noise(x * 0.01, Some(y * 0.01), None) - 0.5) * s * 50.;
+        out0[i].1 += (noise(x * 0.01, Some(y * 0.01), None) - 0.5) * s * 50.;
+    }
+    let cc = out0
+        .clone()
+        .into_iter()
+        .chain(curve.clone().into_iter().rev())
+        .collect();
+    let mut out1 = clip(&trsl_poly(&out0, 0., 4.), &cc).clip;
+    fn shape((x, y): Point, t: usize) -> bool {
+        randf() < (t as f64 * PI).sin()
+    }
+    out1 = binclip_multi(&out1, shape).clip;
+    return (cc, vec![out0].into_iter().chain(out1).collect());
+}
 
 pub fn fish_lip((mut x0, mut y0): Point, (mut x1, mut y1): Point, w: f64) -> Polyline {
     x0 += randf() * 0.001 - 0.0005;
@@ -868,8 +916,8 @@ pub fn fish_head(
     }
 
     let par = [0.475, 0.375];
-    let mut ex = x0 * par[0] + x1 * par[1] + x2 * (1. - par[0] - par[1]);
-    let mut ey = y0 * par[0] + y1 * par[1] + y2 * (1. - par[0] - par[1]);
+    let mut ex = x0 * par.0 + x1 * par.1 + x2 * (1. - par.0 - par.1);
+    let mut ey = y0 * par.0 + y1 * par.1 + y2 * (1. - par.0 - par.1);
     let d0 = pt_seg_dist((ex, ey), (x0, y0), (x1, y1));
     let d1 = pt_seg_dist((ex, ey), (x0, y0), (x2, y2));
     if (d0 < arg.eye_size && d1 < arg.eye_size) {
@@ -959,8 +1007,8 @@ pub fn fish_head(
 
     if (arg.has_beard != 0) {
         let jaw_pt;
-        if (!jaw.is_empty() && !jaw[0].is_empty()) {
-            jaw_pt = jaw[0][!!(jaw[0].len() / 2)];
+        if (!jaw.is_empty() && !jaw.0.is_empty()) {
+            jaw_pt = jaw.0[!!(jaw.0.len() / 2)];
         } else {
             jaw_pt = curve1[8];
         }
@@ -995,9 +1043,9 @@ pub fn fish_head(
             randf() * 1. - 0.5,
         );
 
-        let mut bb3c = clip_multi(&vec![bb3], &bb2, None).dont_clip;
-        bb3c = clip_multi(&bb3c, &bb1, None).dont_clip;
-        let bb2c = clip_multi(&vec![bb2], &bb1, None).dont_clip;
+        let mut bb3c = clip_multi(&vec![bb3], &bb2).dont_clip;
+        bb3c = clip_multi(&bb3c, &bb1).dont_clip;
+        let bb2c = clip_multi(&vec![bb2], &bb1).dont_clip;
         bbs.push(bb1);
         bbs.extend(bb2c.into_iter().chain(bb3c));
     }
@@ -1008,7 +1056,7 @@ pub fn fish_head(
         curve0[curve0.len() - 1],
     ];
     outline_l.extend(curve2);
-    outline_l.extend([curve1[0], (curve1[0].0, 300.), (0., 300.)]);
+    outline_l.extend([curve1.0, (curve1.0 .0, 300.), (0., 300.)]);
 
     return (
         outline_l,
@@ -1144,7 +1192,7 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
         f0_curve = resample(&curve0[arg.dorsal_start..arg.dorsal_end], 15.);
         todo!("let (c0, f0) = fin_b(f0_curve,f0_a0,f0_a1,f0_func)");
     }
-    f0 = clip_multi(&f0, &trsl_poly(&outline, 0., 0.001), None).dont_clip;
+    f0 = clip_multi(&f0, &trsl_poly(&outline, 0., 0.001)).dont_clip;
 
     let mut f1_curve = vec![];
     let mut f1_func: Box<dyn Fn(f64) -> f64>;
@@ -1189,7 +1237,7 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
         f1_curve = resample(&f1_curve, 4.);
         todo!("let (c1, f1) = fin_b(f1_curve,f1_a0,f1_a1,f1_func,0.3)");
     }
-    bd = clip_multi(&bd, &c1, None).dont_clip;
+    bd = clip_multi(&bd, &c1).dont_clip;
 
     let f2_curve;
     let mut f2_func: Box<dyn Fn(f64) -> f64>;
@@ -1222,7 +1270,7 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
         );
         todo!("let (c2, f2) = fin_b(f2_curve,f2_a0,f2_a1,f2_func)");
     }
-    f2 = clip_multi(&f2, &c1, None).dont_clip;
+    f2 = clip_multi(&f2, &c1).dont_clip;
 
     let f3_curve;
     let f3_func: Box<dyn Fn(f64) -> f64>;
@@ -1249,7 +1297,7 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
         f3_curve = resample(&rev_slice(&curve1, arg.anal_start, arg.anal_end), 15.);
         todo!("let (c3, f3) = fin_b(f3_curve,f3_a0,f3_a1,f3_func)");
     }
-    f3 = clip_multi(&f3, &c1, None).dont_clip;
+    f3 = clip_multi(&f3, &c1).dont_clip;
 
     let f4_curve;
     let c4;
@@ -1273,7 +1321,7 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
         f4_curve = vec![curve0[curve0.len() - 1], curve1[curve1.len() - 1]];
         f4_curve = resample(&f4_curve, f4_d * 0.7);
         let cv = arg.tail_length / 8;
-        todo!("let (c4,f4) = fin_a(f4_curve,-0.6,0.6,t=>(  (Math.abs(Math.cos(PI*t))*0.8+0.2)*arg.tail_length  ),1,cv,-cv)");
+        todo!("let (c4,f4) = fin_a(f4_curve,-0.6,0.6,t=>(  (f64::abs(f64::cos(PI*t))*0.8+0.2)*arg.tail_length  ),1,cv,-cv)");
     } else if (arg.tail_type == 3) {
         f4_curve = vec![curve0[curve0.len() - 2], curve1[curve1.len() - 2]];
         f4_curve = resample(&f4_curve, f4_d);
@@ -1292,9 +1340,9 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
         );
     }
     // f4 = clip_multi(f4,trsl_poly(outline,-1,0)).dont_clip;
-    bd = clip_multi(&bd, &trsl_poly(c4, 1., 0.), None).dont_clip;
+    bd = clip_multi(&bd, &trsl_poly(c4, 1., 0.)).dont_clip;
 
-    f4 = clip_multi(&f4, &c1, None).dont_clip;
+    f4 = clip_multi(&f4, &c1).dont_clip;
 
     let f5_curve = vec![];
     let c5 = vec![];
@@ -1335,14 +1383,14 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
             arg,
         );
     }
-    bd = clip_multi(&bd, &cf, None).dont_clip;
+    bd = clip_multi(&bd, &cf).dont_clip;
 
-    sh = clip_multi(&sh, &cf, None).dont_clip;
-    sh = clip_multi(&sh, &c1, None).dont_clip;
+    sh = clip_multi(&sh, &cf).dont_clip;
+    sh = clip_multi(&sh, &c1).dont_clip;
 
-    f1 = clip_multi(&f1, &cf, None).dont_clip;
+    f1 = clip_multi(&f1, &cf).dont_clip;
 
-    f0 = clip_multi(&f0, &c1, None).dont_clip;
+    f0 = clip_multi(&f0, &c1).dont_clip;
 
     let sh2 = vec![];
     if let Some(func) = (pattern_func) {
@@ -1353,15 +1401,15 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
         } else {
             sh2 = todo!("patternshade_shape(c0, 4.5, func)");
         }
-        sh2 = clip_multi(&sh2, &cf, None).dont_clip;
-        sh2 = clip_multi(&sh2, &c1, None).dont_clip;
+        sh2 = clip_multi(&sh2, &cf).dont_clip;
+        sh2 = clip_multi(&sh2, &c1).dont_clip;
     }
 
     let sh3 = [];
     if (arg.pattern_type == 4) {
         sh3 = todo!("smalldot_shape(poly_union(outline, trsl_poly(c0, 0, 5)), arg.pattern_scale)");
-        sh3 = todo!("clip_multi(&sh3, &c1, None).dont_clip");
-        sh3 = todo!("clip_multi(&sh3, &cf, None).dont_clip");
+        sh3 = todo!("clip_multi(&sh3, &c1, ).dont_clip");
+        sh3 = todo!("clip_multi(&sh3, &cf, ).dont_clip");
     }
     bd.extend(f0);
     bd.extend(f1);
@@ -1451,7 +1499,7 @@ pub fn cleanup(polylines: Vec<Polyline>) -> Vec<Vec<(f64, f64)>> {
             continue;
         }
         if (polylines[i].len() == 2) {
-            if (dist(polylines[i][0], polylines[i][1]) < 0.9) {
+            if (dist(polylines[i].0, polylines[i].1) < 0.9) {
                 polylines.splice(i..1, []);
                 continue;
             }

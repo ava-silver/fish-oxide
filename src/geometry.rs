@@ -516,15 +516,10 @@ pub fn clip(polyline: &Polyline, polygon: &Polyline) -> ClipSegments {
     out.filter_empty()
 }
 
-pub fn clip_multi(
-    polylines: &Vec<Polyline>,
-    polygon: &Polyline,
-    clipper_func_opt: Option<fn(&Polyline, &Polyline) -> ClipSegments>,
-) -> ClipSegments {
-    let clipper_func = clipper_func_opt.unwrap_or(clip);
+pub fn clip_multi(polylines: &Vec<Polyline>, polygon: &Polyline) -> ClipSegments {
     let mut out = ClipSegments::default();
     for polyline in polylines {
-        out.extend(clipper_func(polyline, polygon));
+        out.extend(clip(polyline, polygon));
     }
     return out;
 }
@@ -563,6 +558,14 @@ pub fn binclip(polyline: &Polyline, func: fn(Point, usize) -> bool) -> ClipSegme
     out.filter_empty()
 }
 
+pub fn binclip_multi(polylines: &Vec<Polyline>, f: fn(Point, usize) -> bool) -> ClipSegments {
+    let mut out = ClipSegments::default();
+    for polyline in polylines {
+        out.extend(binclip(polyline, f));
+    }
+    return out;
+}
+
 pub fn trsl_poly(poly: &Polyline, x: f64, y: f64) -> Polyline {
     return poly.iter().map(|(x0, y0)| (x0 + x, y0 + y)).collect();
 }
@@ -588,11 +591,11 @@ pub fn shade_shape(
     .map(|i| vec![(bbox.x + i, bbox.y), (bbox.x + i + bbox.h, bbox.y + bbox.h)])
     .collect();
 
-    lines = clip_multi(&lines, poly, None).clip;
+    lines = clip_multi(&lines, poly).clip;
 
     let carve = trsl_poly(poly, -dx, -dy);
 
-    lines = clip_multi(&lines, &carve, None).dont_clip;
+    lines = clip_multi(&lines, &carve).dont_clip;
 
     for i in 0..lines.len() {
         let line = &lines[i];
@@ -630,7 +633,7 @@ pub fn fill_shape(poly: &Polyline, step_opt: Option<f64>) -> Vec<Vec<(f64, f64)>
         let y1 = bbox.y + bbox.h;
         lines.push(vec![(x0, y0), (x1, y1)]);
     }
-    lines = clip_multi(&lines, &poly, None).clip;
+    lines = clip_multi(&lines, &poly).clip;
 
     return lines;
 }
@@ -679,7 +682,7 @@ pub fn vein_shape(poly: &Polyline, n_opt: Option<i64>) -> Vec<Polyline> {
         }
         out.push(o);
     }
-    out = clip_multi(&out, poly, None).clip;
+    out = clip_multi(&out, poly).clip;
     return out;
 }
 /*
@@ -938,59 +941,65 @@ pub fn poissondisk(W, H, r, samples) {
   };
 }
 
-fn pow(a,b){
+pub fn pow(a,b){
   return Math.sign(a) * Math.pow(Math.abs(a),b);
 }
 
-fn gauss2d(x, y){
+pub fn gauss2d(x, y){
   let z0 = exp(-0.5*x*x);
   let z1 = exp(-0.5*y*y);
   return z0*z1;
  }
-
-fn squama_mask(w,h){
-  let p = [];
-  let n = 7;
-  for i in 0..n {
-    let t = i/n;
-    let a = t * PI * 2;
-    let x = -pow(Math.cos(a),1.3)*w;
-    let y =  pow(Math.sin(a),1.3)*h;
-    p.push([x,y]);
-  }
-  return p;
+ */
+pub fn squama_mask(w: f64, h: f64) -> Polyline {
+    let mut p = vec![];
+    let n = 7;
+    for i in 0..n {
+        let t = i / n;
+        let a = t as f64 * PI * 2.;
+        let x = -f64::powf(a.cos(), 1.3) * w;
+        let y = f64::powf(a.sin(), 1.3) * h;
+        p.push((x, y));
+    }
+    return p;
 }
 
-
-fn squama(w,h,m=3) {
-  let p = [];
-  let n = 8;
-  for i in 0..n {
-    let t = i/(n-1);
-    let a = t * PI + PI/2;
-    let x = -pow(Math.cos(a),1.4)*w;
-    let y =  pow(Math.sin(a),1.4)*h;
-    p.push([x,y]);
-  }
-  let q = [p];
-  for i in 0..m {
-    let t = i/(m-1);
-    q.push([
-      [-w*0.3 + (rand()-0.5),-h*0.2+t*h*0.4 + (rand()-0.5)],
-      [ w*0.5 + (rand()-0.5),-h*0.3+t*h*0.6 + (rand()-0.5)]
-    ]);
-  }
-  return q;
+pub fn squama(w: f64, h: f64, m_opt: Option<usize>) -> Vec<Polyline> {
+    let m = m_opt.unwrap_or(3);
+    let mut p = vec![];
+    let n = 8;
+    for i in 0..n {
+        let t = i as f64 / (n - 1) as f64;
+        let a = t * PI + PI / 2.;
+        let x = -f64::powf(f64::cos(a), 1.4) * w;
+        let y = f64::powf(f64::sin(a), 1.4) * h;
+        p.push((x, y));
+    }
+    let mut q = vec![p];
+    for i in 0..m {
+        let t = i as f64 / (m - 1) as f64;
+        q.push(vec![
+            (
+                -w * 0.3 + (randf() - 0.5),
+                -h * 0.2 + t * h * 0.4 + (randf() - 0.5),
+            ),
+            (
+                w * 0.5 + (randf() - 0.5),
+                -h * 0.3 + t * h * 0.6 + (randf() - 0.5),
+            ),
+        ]);
+    }
+    return q;
 }
-
-fn scl_poly(poly,sx,sy){
+/*
+pub fn scl_poly(poly,sx,sy){
   if (sy === undefined) sy = sx;
   return poly.map(xy=>[xy[0]*sx,xy[1]*sy]);
 }
-fn shr_poly(poly,sx){
+pub fn shr_poly(poly,sx){
   return poly.map(xy=>[xy[0]+xy[1]*sx,xy[1]]);
 }
-fn rot_poly(poly,th){
+pub fn rot_poly(poly,th){
   let qoly = [];
   let costh = Math.cos(th);
   let sinth = Math.sin(th);
@@ -1003,7 +1012,7 @@ fn rot_poly(poly,th){
   return qoly;
 }
 
-fn squama_mesh(m,n,uw,uh,squama_func,noise_x,noise_y,interclip=true){
+pub fn squama_mesh(m,n,uw,uh,squama_func,noise_x,noise_y,interclip=true){
   let clipper = None;
 
   let pts = [];
@@ -1100,7 +1109,7 @@ fn squama_mesh(m,n,uw,uh,squama_func,noise_x,noise_y,interclip=true){
   return out;
 }
 
-fn pattern_dot(scale=1){
+pub fn pattern_dot(scale=1){
   let samples = [];
   poissondisk(500,300,20*scale,samples);
   let rs = [];
