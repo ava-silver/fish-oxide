@@ -2,7 +2,7 @@
 use clap::{command, Parser, ValueEnum};
 use core::f64;
 use core::f64::consts::{E, PI};
-use draw::{cleanup, fish, reframe};
+use draw::{cleanup, draw_svg, fish, reframe};
 use geometry::{dist, get_boundingbox, trsl_poly, Polyline};
 use hershey::compile_hershey;
 use params::generate_params;
@@ -78,8 +78,7 @@ fn main() {
         "{}",
         match format {
             Format::Svg => {
-                todo!()
-                // draw_svg(polylines)
+                draw_svg(polylines)
             }
             Format::Json => {
                 serde_json::to_string(&polylines).unwrap()

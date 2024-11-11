@@ -14,20 +14,24 @@ use crate::{
     params::Params,
 };
 
-/*
-pub pub fn draw_svg(polylines){
-  let o = `<svg xmlns="http://www.w3.org/2000/svg" width="520" height="320">`
-  o += `<rect x="0" y="0" width="520" height="320" fill="floralwhite"/><rect x="10" y="10" width="500" height="300" stroke="black" stroke-width="1" fill="none"/><path stroke="black" stroke-width="1" fill="none" stroke-linecap="round" stroke-linejoin="round" d="`
-  for (let i = 0; i < polylines.length; i++){
-    o += '\nM ';
-    for (let j = 0; j < polylines[i].length; j++){
-      let [x,y] = polylines[i][j];
-      o += `${(~~((x+10)*100)) /100} ${(~~((y+10)*100)) /100} `;
+pub fn draw_svg(polylines: Vec<Polyline>) -> String {
+    let mut o =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"520\" height=\"320\">".to_owned();
+    o.push_str("<rect x=\"0\" y=\"0\" width=\"520\" height=\"320\" fill=\"floralwhite\"/><rect x=\"10\" y=\"10\" width=\"500\" height=\"300\" stroke=\"black\" stroke-width=\"1\" fill=\"none\"/><path stroke=\"black\" stroke-width=\"1\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"");
+    for line in polylines.iter() {
+        o.push_str("\nM ");
+        for (x, y) in line.iter() {
+            o.push_str(&format!(
+                "{} {} ",
+                (((x + 10.) * 100.).trunc()) / 100.,
+                ((y + 10.) * 100.).trunc() / 100.
+            ));
+        }
     }
-  }
-  o += `\n"/></svg>`
-  return o;
+    o.push_str("\n\"/></svg>");
+    return o;
 }
+/*
 
 pub pub fn draw_svg_anim(polylines,speed){
   let o = `<svg xmlns="http://www.w3.org/2000/svg" width="520" height="320">`;
