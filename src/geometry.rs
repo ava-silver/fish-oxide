@@ -953,26 +953,21 @@ pub fn gauss2d(x, y){
  }
  */
 
+pub fn scl_poly(poly: &Polyline, sx: f64, sy_opt: Option<f64>) -> Polyline {
+    let sy = sy_opt.unwrap_or(sx);
+    poly.iter().map(|xy| (xy.0 * sx, xy.1 * sy)).collect()
+}
+pub fn shr_poly(poly: &Polyline, sx: f64) -> Polyline {
+    poly.iter().map(|xy| (xy.0 + xy.1 * sx, xy.1)).collect()
+}
+pub fn rot_poly(poly: &Polyline, th: f64) -> Polyline {
+    let costh = f64::cos(th);
+    let sinth = f64::sin(th);
+    poly.iter()
+        .map(|(x0, y0)| (x0 * costh - y0 * sinth, x0 * sinth + y0 * costh))
+        .collect()
+}
 /*
-pub fn scl_poly(poly,sx,sy){
-  if (sy === undefined) sy = sx;
-  return poly.map(xy=>[xy[0]*sx,xy[1]*sy]);
-}
-pub fn shr_poly(poly,sx){
-  return poly.map(xy=>[xy[0]+xy[1]*sx,xy[1]]);
-}
-pub fn rot_poly(poly,th){
-  let qoly = [];
-  let costh = Math.cos(th);
-  let sinth = Math.sin(th);
-  for i in 0..poly.len() {
-    let [x0,y0] = poly[i]
-    let x = x0* costh-y0*sinth;
-    let y = x0* sinth+y0*costh;
-    qoly.push([x,y]);
-  }
-  return qoly;
-}
 
 
 pub fn pattern_dot(scale=1){

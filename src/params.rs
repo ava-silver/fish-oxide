@@ -1,5 +1,6 @@
 use crate::custom_rand::{choice, rndtri, rndtri_f};
 
+#[derive(Debug, Clone, Copy)]
 pub struct Params {
     pub body_curve_type: i64,
     pub body_curve_amount: f64,
@@ -32,7 +33,7 @@ pub struct Params {
     pub anal_type: i64,
     pub anal_texture_type: i64,
     pub tail_type: i64,
-    pub tail_length: i64,
+    pub tail_length: f64,
     pub finlet_type: i64,
     pub neck_type: i64,
     pub nose_height: f64,
@@ -43,7 +44,7 @@ pub struct Params {
     pub moustache_length: usize,
     pub has_beard: i64,
     pub has_teeth: i64,
-    pub teeth_length: i64,
+    pub teeth_length: f64,
     pub teeth_space: f64,
     pub beard_length: usize,
     pub eye_type: i64,
@@ -85,7 +86,7 @@ impl Params {
             anal_type: 0,
             anal_texture_type: 0,
             tail_type: 0,
-            tail_length: 75,
+            tail_length: 75.,
             finlet_type: 0,
             neck_type: 0,
             nose_height: 0.,
@@ -96,7 +97,7 @@ impl Params {
             moustache_length: 10,
             has_beard: 0,
             has_teeth: 1,
-            teeth_length: 8,
+            teeth_length: 8.,
             teeth_space: 3.5,
             beard_length: 30,
             eye_type: 1,
@@ -130,7 +131,8 @@ pub fn generate_params() -> Params {
         arg.dorsal_start = !!rndtri(11, 12, 16) as usize;
         arg.dorsal_end = !!rndtri(19, 21, 24) as usize;
     }
-    arg.wing_texture_type = *choice(&[0, 1], None);
+    // arg.wing_texture_type = *choice(&[0, 1], None); TODO: fix this
+    arg.wing_texture_type = 0;
     arg.wing_type = *choice(&[0, 1], None);
     if (arg.wing_type == 0) {
         arg.wing_length = rndtri_f(40., 130., 200.);
@@ -174,7 +176,7 @@ pub fn generate_params() -> Params {
     arg.anal_end = !!rndtri(25, 29, 31) as usize;
 
     arg.tail_type = *choice(&[0, 1, 2, 3, 4, 5], None);
-    arg.tail_length = rndtri(50, 75, 180);
+    arg.tail_length = rndtri_f(50., 75., 180.);
 
     arg.finlet_type = *choice(&[0, 1, 2, 3], None);
 
@@ -195,7 +197,7 @@ pub fn generate_params() -> Params {
     arg.jaw_size = rndtri_f(0.7, 1., 1.4);
 
     arg.has_teeth = *choice(&[0, 1, 1], None);
-    arg.teeth_length = rndtri(5, 8, 15);
+    arg.teeth_length = rndtri_f(5., 8., 15.);
     arg.teeth_space = rndtri_f(3., 3.5, 6.);
 
     return arg;
