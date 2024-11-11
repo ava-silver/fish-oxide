@@ -951,46 +951,7 @@ pub fn gauss2d(x, y){
   return z0*z1;
  }
  */
-pub fn squama_mask(w: f64, h: f64) -> Polyline {
-    let mut p = vec![];
-    let n = 7;
-    for i in 0..n {
-        let t = i / n;
-        let a = t as f64 * PI * 2.;
-        let x = -f64::powf(a.cos(), 1.3) * w;
-        let y = f64::powf(a.sin(), 1.3) * h;
-        p.push((x, y));
-    }
-    return p;
-}
 
-pub fn squama(w: f64, h: f64, m_opt: Option<usize>) -> Vec<Polyline> {
-    let m = m_opt.unwrap_or(3);
-    let mut p = vec![];
-    let n = 8;
-    for i in 0..n {
-        let t = i as f64 / (n - 1) as f64;
-        let a = t * PI + PI / 2.;
-        let x = -f64::powf(f64::cos(a), 1.4) * w;
-        let y = f64::powf(f64::sin(a), 1.4) * h;
-        p.push((x, y));
-    }
-    let mut q = vec![p];
-    for i in 0..m {
-        let t = i as f64 / (m - 1) as f64;
-        q.push(vec![
-            (
-                -w * 0.3 + (randf() - 0.5),
-                -h * 0.2 + t * h * 0.4 + (randf() - 0.5),
-            ),
-            (
-                w * 0.5 + (randf() - 0.5),
-                -h * 0.3 + t * h * 0.6 + (randf() - 0.5),
-            ),
-        ]);
-    }
-    return q;
-}
 /*
 pub fn scl_poly(poly,sx,sy){
   if (sy === undefined) sy = sx;
@@ -1012,102 +973,6 @@ pub fn rot_poly(poly,th){
   return qoly;
 }
 
-pub fn squama_mesh(m,n,uw,uh,squama_func,noise_x,noise_y,interclip=true){
-  let clipper = None;
-
-  let pts = [];
-  for i in 0..n {
-    for j in 0..m; j++){
-      let x = j*uw;
-      let y = (n*uh/2) - Math.cos(i/(n-1) * PI) * (n*uh/2);
-      let a = noise(x*0.005,y*0.005)*PI*2-PI;
-      let r = noise(x*0.005,y*0.005);
-      let dx = Math.cos(a)*r*noise_x;
-      let dy = Math.cos(a)*r*noise_y;
-      pts.push([x+dx,y+dy]);
-    }
-  }
-  let out = [];
-
-  let whs = [];
-  for i in 0..n {
-    for j in 0..m; j++){
-      if (i == 0 || j == 0 || i == n-1 || j == m-1){
-        whs.push([uw/2,uh/2]);
-        continue;
-      }
-      let a = pts[i*m+j];
-      let b = pts[i*m+j+1];
-      let c = pts[i*m+j-1];
-      let d = pts[(i-1)*m+j];
-      let e = pts[(i+1)*m+j];
-
-      let dw = (dist(...a,...b) + dist(...a,...c))/4
-      let dh = (dist(...a,...d) + dist(...a,...e))/4
-      whs.push([dw,dh]);
-    }
-  }
-
-  for j in 1; j < m-1; j++){
-    for i in 1; i < n-1 {
-      let [x,y]  = pts[i*m+j];
-      let [dw,dh]= whs[i*m+j];
-      let q = trsl_poly(squama_mask(dw,dh),x,y);
-
-      let p = squama_func(x,y,dw,dh).map(a=>trsl_poly(a,x,y));
-      if (!interclip){
-        out.push(...p);
-      }else{
-        if (clipper){
-          out.push(...clip_multi(p,clipper).dont_clip);
-          clipper = poly_union(clipper,q);
-        }else{
-          out.push(...p);
-          clipper = q;
-        }
-      }
-    }
-    for i in 1; i < n-1 {
-      let a = pts[i*m+j];
-      let b = pts[i*m+j+1];
-      let c = pts[(i+1)*m+j];
-      let d = pts[(i+1)*m+j+1];
-
-      let [dwa,dha] = whs[i*m+j];
-      let [dwb,dhb] = whs[i*m+j+1];
-      let [dwc,dhc] = whs[(i+1)*m+j];
-      let [dwd,dhd] = whs[(i+1)*m+j+1];
-
-      let [x,y] = [(a[0]+b[0]+c[0]+d[0])/4,(a[1]+b[1]+c[1]+d[1])/4];
-      let [dw,dh] = [(dwa+dwb+dwc+dwd)/4,(dha+dhb+dhc+dhd)/4];
-      dw *= 1.2;
-      let q = trsl_poly(squama_mask(dw,dh),x,y);
-
-      let p = squama_func(x,y,dw,dh).map(a=>trsl_poly(a,x,y));
-      if (!interclip){
-        out.push(...p);
-      }else{
-        if (clipper){
-          out.push(...clip_multi(p,clipper).dont_clip);
-          clipper = poly_union(clipper,q);
-        }else{
-          out.push(...p);
-          clipper = q;
-        }
-      }
-    }
-  }
-  // for i in 0..n-1 {
-  //   for j in 0..m-1; j++){
-  //     let a= pts[i*m+j];
-  //     let b= pts[i*m+j+1];
-  //     let c = pts[(i+1)*m+j];
-  //     out.push([a,b]);
-  //     out.push([a,c]);
-  //   }
-  // }
-  return out;
-}
 
 pub fn pattern_dot(scale=1){
   let samples = [];

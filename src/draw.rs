@@ -1,9 +1,13 @@
-use std::f64::consts::{E, PI};
+use std::{
+    f64::consts::{E, PI},
+    rc::Rc,
+};
 
 use crate::{
     custom_rand::{deviate, noise, rand, randf},
     geometry::{
-        binclip_multi, clip, clip_multi, dist, fill_shape, get_boundingbox, lerp, lerp2d, poly_union, pt_seg_dist, resample, shade_shape, squama, trsl_poly, vein_shape, Point, Polyline
+        binclip_multi, clip, clip_multi, dist, fill_shape, get_boundingbox, lerp, lerp2d,
+        poly_union, pt_seg_dist, resample, shade_shape, trsl_poly, vein_shape, Point, Polyline,
     },
     hershey::compile_hershey,
     params::Params,
@@ -106,12 +110,163 @@ F
   return o;
 }
 */
+fn squama_mask(w: f64, h: f64) -> Polyline {
+    let mut p = vec![];
+    let n = 7;
+    for i in 0..n {
+        let t = i / n;
+        let a = t as f64 * PI * 2.;
+        let x = -f64::powf(a.cos(), 1.3) * w;
+        let y = f64::powf(a.sin(), 1.3) * h;
+        p.push((x, y));
+    }
+    return p;
+}
 
-pub fn fish_body_a(
+fn squama(w: f64, h: f64, m_opt: Option<usize>) -> Vec<Polyline> {
+    let m = m_opt.unwrap_or(3);
+    let mut p = vec![];
+    let n = 8;
+    for i in 0..n {
+        let t = i as f64 / (n - 1) as f64;
+        let a = t * PI + PI / 2.;
+        let x = -f64::powf(f64::cos(a), 1.4) * w;
+        let y = f64::powf(f64::sin(a), 1.4) * h;
+        p.push((x, y));
+    }
+    let mut q = vec![p];
+    for i in 0..m {
+        let t = i as f64 / (m - 1) as f64;
+        q.push(vec![
+            (
+                -w * 0.3 + (randf() - 0.5),
+                -h * 0.2 + t * h * 0.4 + (randf() - 0.5),
+            ),
+            (
+                w * 0.5 + (randf() - 0.5),
+                -h * 0.3 + t * h * 0.6 + (randf() - 0.5),
+            ),
+        ]);
+    }
+    return q;
+}
+
+pub fn squama_mesh(
+    m: usize,
+    n: usize,
+    (uw, uh): Point,
+    squama_func: Box<dyn Fn(Point, Point) -> Vec<Polyline>>,
+    (noise_x, noise_y): Point,
+    interclip_opt: Option<bool>,
+) -> Vec<Polyline> {
+    let interclip = interclip_opt.unwrap_or(true);
+    let mut clipper: Option<Polyline> = None;
+
+    let mut pts = vec![];
+    for i in 0..n {
+        for j in 0..m {
+            let x = j as f64 * uw;
+            let y = (n as f64 * uh / 2.)
+                - f64::cos(i as f64 / (n as f64 - 1.) * PI) * (n as f64 * uh / 2.);
+            let a = noise(x * 0.005, Some(y * 0.005), None) * PI * 2. - PI;
+            let r = noise(x * 0.005, Some(y * 0.005), None);
+            let dx = f64::cos(a) * r * noise_x;
+            let dy = f64::cos(a) * r * noise_y;
+            pts.push((x + dx, y + dy));
+        }
+    }
+    let mut out = vec![];
+
+    let mut whs = vec![];
+    for i in 0..n {
+        for j in 0..m {
+            if (i == 0 || j == 0 || i == n - 1 || j == m - 1) {
+                whs.push((uw / 2., uh / 2.));
+                continue;
+            }
+            let a = pts[i * m + j];
+            let b = pts[i * m + j + 1];
+            let c = pts[i * m + j - 1];
+            let d = pts[(i - 1) * m + j];
+            let e = pts[(i + 1) * m + j];
+
+            let dw = (dist(a, b) + dist(a, c)) / 4.;
+            let dh = (dist(a, d) + dist(a, e)) / 4.;
+            whs.push((dw, dh));
+        }
+    }
+
+    for j in 1..m - 1 {
+        for i in 1..n - 1 {
+            let (x, y) = pts[i * m + j];
+            let (dw, dh) = whs[i * m + j];
+            let q = trsl_poly(&squama_mask(dw, dh), x, y);
+            let p: Vec<Polyline> = squama_func((x, y), (dw, dh))
+                .into_iter()
+                .map(|a| trsl_poly(&a, x, y))
+                .collect();
+            if (!interclip) {
+                out.extend(p.into_iter());
+            } else {
+                if let Some(c) = clipper {
+                    out.extend(clip_multi(&p, &c).dont_clip.into_iter());
+                    clipper = Some(poly_union(&c, &q, None));
+                } else {
+                    out.extend(p.into_iter());
+                    clipper = Some(q);
+                }
+            }
+        }
+        for i in 1..n - 1 {
+            let a = pts[i * m + j];
+            let b = pts[i * m + j + 1];
+            let c = pts[(i + 1) * m + j];
+            let d = pts[(i + 1) * m + j + 1];
+
+            let (dwa, dha) = whs[i * m + j];
+            let (dwb, dhb) = whs[i * m + j + 1];
+            let (dwc, dhc) = whs[(i + 1) * m + j];
+            let (dwd, dhd) = whs[(i + 1) * m + j + 1];
+
+            let (x, y) = ((a.0 + b.0 + c.0 + d.0) / 4., (a.1 + b.1 + c.1 + d.1) / 4.);
+            let (mut dw, dh) = ((dwa + dwb + dwc + dwd) / 4., (dha + dhb + dhc + dhd) / 4.);
+            dw *= 1.2;
+            let q = trsl_poly(&squama_mask(dw, dh), x, y);
+
+            let p: Vec<Polyline> = squama_func((x, y), (dw, dh))
+                .into_iter()
+                .map(|a| trsl_poly(&a, x, y))
+                .collect();
+            if (!interclip) {
+                out.extend(p.into_iter());
+            } else {
+                if let Some(c) = clipper {
+                    out.extend(clip_multi(&p, &c).dont_clip.into_iter());
+                    clipper = Some(poly_union(&c, &q, None));
+                } else {
+                    out.extend(p.into_iter());
+                    clipper = Some(q);
+                }
+            }
+        }
+    }
+    // for i in 0..n-1 {
+    //   for j in 0..m-1; j++){
+    //     let a= pts[i*m+j];
+    //     let b= pts[i*m+j+1];
+    //     let c = pts[(i+1)*m+j];
+    //     out.push([a,b]);
+    //     out.push([a,c]);
+    //   }
+    // }
+    return out;
+}
+
+fn fish_body_a(
     curve0: &Polyline,
     curve1: &Polyline,
     scale_scale: f64,
-    pattern_func: Option<impl Fn(Point) -> f64>,
+    pattern_func: Option<Rc<dyn Fn(Point) -> bool>>,
 ) -> Vec<Polyline> {
     let mut curve2 = vec![];
     let mut curve3 = vec![];
@@ -119,7 +274,7 @@ pub fn fish_body_a(
         curve2.push(lerp2d(curve0[i], curve1[i], 0.95));
         curve3.push(lerp2d(curve0[i], curve1[i], 0.85));
     }
-    let outline1 = curve0
+    let outline1: Polyline = curve0
         .clone()
         .into_iter()
         .chain(curve1.clone().into_iter().rev())
@@ -136,20 +291,21 @@ pub fn fish_body_a(
         .collect();
 
     let bbox = get_boundingbox(&curve0.clone().into_iter().chain(curve1.clone()).collect());
-    let m = (bbox.w / (scale_scale * 15.)).trunc();
-    let n = (bbox.h / (scale_scale * 15.)).trunc();
-    let uw = bbox.w / m;
-    let uh = bbox.h / n;
-
-    let funky: Box<dyn Fn(Point, Point) -> Vec<Polyline>> = if let Some(funky_wunk) = pattern_func {
-        Box::new(|(x, y), (w, h)| squama(w, h, Some(funky_wunk((x, y)) as usize * 3)))
+    let m = (bbox.w / (scale_scale * 15.)).trunc() as usize;
+    let n = (bbox.h / (scale_scale * 15.)).trunc() as usize;
+    let uw = bbox.w / m as f64;
+    let uh = bbox.h / n as f64;
+    let funky: Box<dyn Fn(Point, Point) -> Vec<Polyline>> = if let Some(f) = pattern_func {
+        Box::new(move |(x, y), (w, h)| squama(w, h, Some(f((x, y)) as usize * 3)))
     } else {
         Box::new(|(x, y), (w, h)| squama(w, h, None))
     };
-    let sq = squama_mesh(m, n + 3, uw, uh, funky, uw * 3, uh * 3, true)
-        .map(|a| trsl_poly(a, bbox.x, bbox.y - uh * 1.5));
+    let sq = squama_mesh(m, n + 3, (uw, uh), funky, (uw * 3., uh * 3.), Some(true))
+        .into_iter()
+        .map(|a| trsl_poly(&a, bbox.x, bbox.y - uh * 1.5))
+        .collect();
     let o0 = clip_multi(&sq, &outline2).clip;
-    let o1 = clip_multi(&o0, &outline3);
+    let mut o1 = clip_multi(&o0, &outline3);
     o1.dont_clip = o1.dont_clip.into_iter().filter(|x| randf() < 0.6).collect();
     let mut curve1_rev = curve1.clone();
 
@@ -333,7 +489,7 @@ pub fn fin_a(
     curvature0_opt: Option<f64>,
     curvature1_opt: Option<f64>,
     softness_opt: Option<f64>,
-) {
+) -> (Polyline, Vec<Polyline>) {
     let clip_root = clip_root_opt.unwrap_or(false);
     let curvature0 = curvature0_opt.unwrap_or(0.);
     let curvature1 = curvature1_opt.unwrap_or(0.);
@@ -350,7 +506,7 @@ pub fn fin_a(
             );
         } else {
             let a0 = f64::atan2(curve[i - 1].1 - curve[i].1, curve[i - 1].0 - curve[i].0);
-            let a1 = f64::atan2(curve[i + 1].1 - curve[i].1, curve[i + 1].0 - curve[i].0);
+            let mut a1 = f64::atan2(curve[i + 1].1 - curve[i].1, curve[i + 1].0 - curve[i].0);
             while (a1 > a0) {
                 a1 -= PI * 2.;
             }
@@ -373,7 +529,7 @@ pub fn fin_a(
         let x1 = x0 + f64::cos(a) * w;
         let y1 = y0 + f64::sin(a) * w;
 
-        let p = resample(&[(x0, y0), (x1, y1)], 3.);
+        let mut p = resample(&[(x0, y0), (x1, y1)], 3.);
         for j in 0..p.len() {
             let s = j as f64 / (p.len() - 1) as f64;
             let ss = f64::sqrt(s);
@@ -395,20 +551,25 @@ pub fn fin_a(
             let q = &p[(if clip_root { (rand() * 4) as usize } else { 0 })
                 ..(2.max((p.len() as f64 * (randf() * 0.5 + 0.5)) as usize))];
             if (!q.is_empty()) {
-                out1.push(q);
+                out1.push(q.iter().map(|x| *x).collect());
             }
             // }
         }
     }
     out0 = resample(&out0, 3.);
     for i in 0..out0.len() {
-        let [x, y] = out0[i];
-        out0[i].0 += (noise(x * 0.1, y * 0.1) * 6 - 3) * (softness / 10);
-        out0[i].1 += (noise(x * 0.1, y * 0.1) * 6 - 3) * (softness / 10);
+        let (x, y) = out0[i];
+        out0[i].0 += (noise(x * 0.1, Some(y * 0.1), None) * 6. - 3.) * (softness / 10.);
+        out0[i].1 += (noise(x * 0.1, Some(y * 0.1), None) * 6. - 3.) * (softness / 10.);
     }
-    let o = out2.concat(out0).concat(out3);
-    out1.unshift(o);
-    return [o.concat(curve.slice().reverse()), out1];
+    let mut o: Polyline = out2
+        .into_iter()
+        .chain(out0.into_iter())
+        .chain(out3.into_iter())
+        .collect();
+    out1.insert(0, o.clone());
+    o.extend(curve.clone().into_iter().rev());
+    return (o, out1);
 }
 
 /*
@@ -578,7 +739,7 @@ pub fn fin_adipose(curve: &Polyline, dx: f64, dy: f64, r: f64) -> (Polyline, Vec
     let n = 20;
     let (x0, y0) = curve[(curve.len() / 2)];
     let (x, y) = (x0 + dx, y0 + dy);
-    let (x1, y1) = curve.0;
+    let (x1, y1) = curve[0];
     let (x2, y2) = curve[curve.len() - 1];
     let d1 = dist((x, y), (x1, y1));
     let d2 = dist((x, y), (x2, y2));
@@ -784,8 +945,8 @@ pub fn fish_eye_b(ex: f64, ey: f64, rad: f64) -> (Polyline, Vec<Polyline>) {
 
     let mut ef = fill_shape(&eye2, Some(1.5));
 
-    ef = clip_multi(&ef, &trig, None).dont_clip;
-    eye1 = clip_multi(&eye1, &trig, None).dont_clip;
+    ef = clip_multi(&ef, &trig).dont_clip;
+    eye1 = clip_multi(&eye1, &trig).dont_clip;
     let eye2_clip = clip(&eye2, &trig).dont_clip;
 
     return (
@@ -915,7 +1076,7 @@ pub fn fish_head(
         inline[i] = (inline[i].0 + dix, inline[i].1 + diy);
     }
 
-    let par = [0.475, 0.375];
+    let par = (0.475, 0.375);
     let mut ex = x0 * par.0 + x1 * par.1 + x2 * (1. - par.0 - par.1);
     let mut ey = y0 * par.0 + y1 * par.1 + y2 * (1. - par.0 - par.1);
     let d0 = pt_seg_dist((ex, ey), (x0, y0), (x1, y1));
@@ -942,7 +1103,7 @@ pub fn fish_head(
     } else {
         fish_eye_a(ex, ey, arg.eye_size)
     });
-    ef = clip_multi(&ef, &outline, None).clip;
+    ef = clip_multi(&ef, &outline).clip;
 
     let inlines = clip(&inline, &eye0).dont_clip;
 
@@ -952,8 +1113,8 @@ pub fn fish_head(
 
     let (jc, mut jaw) = fish_jaw(curve1[15 - arg.mouth_size], jaw_pt0, jaw_pt1);
 
-    jaw = clip_multi(&jaw, &lip1, None).dont_clip;
-    jaw = clip_multi(&jaw, &outline, None).dont_clip;
+    jaw = clip_multi(&jaw, &lip1).dont_clip;
+    jaw = clip_multi(&jaw, &outline).dont_clip;
 
     let mut teeth0s = vec![];
     let mut teeth1s = vec![];
@@ -973,8 +1134,8 @@ pub fn fish_head(
             Some(arg.teeth_space),
         );
 
-        teeth0s = clip_multi(&teeth0, &lip0, None).dont_clip;
-        teeth1s = clip_multi(&teeth1, &lip1, None).dont_clip;
+        teeth0s = clip_multi(&teeth0, &lip0).dont_clip;
+        teeth1s = clip_multi(&teeth1, &lip1).dont_clip;
     }
 
     let olines = clip(&outline, &lip0).dont_clip;
@@ -982,8 +1143,8 @@ pub fn fish_head(
     let lip0s = clip(&lip0, &lip1).dont_clip;
 
     let mut sh = shade_shape(&outline, Some(6.), Some(-6.), Some(-6.));
-    sh = clip_multi(&sh, &lip0, None).dont_clip;
-    sh = clip_multi(&sh, &eye0, None).dont_clip;
+    sh = clip_multi(&sh, &lip0).dont_clip;
+    sh = clip_multi(&sh, &eye0).dont_clip;
 
     let mut sh2 = vein_shape(&outline, Some(arg.head_texture_amount));
 
@@ -991,8 +1152,8 @@ pub fn fish_head(
     //   return noise(x*0.1,y*0.1)>0.6;
     // })
 
-    sh2 = clip_multi(&sh2, &lip0, None).dont_clip;
-    sh2 = clip_multi(&sh2, &eye0, None).dont_clip;
+    sh2 = clip_multi(&sh2, &lip0).dont_clip;
+    sh2 = clip_multi(&sh2, &eye0).dont_clip;
 
     let mut bbs = vec![];
 
@@ -1001,14 +1162,14 @@ pub fn fish_head(
     if (arg.has_moustache != 0) {
         let bb0 = barbel(jaw_pt0, arg.moustache_length, PI * 3. / 4., Some(1.5));
         lip1s = clip(&lip1, &bb0).dont_clip;
-        jaw = clip_multi(&jaw, &bb0, None).dont_clip;
+        jaw = clip_multi(&jaw, &bb0).dont_clip;
         bbs.push(bb0);
     }
 
     if (arg.has_beard != 0) {
         let jaw_pt;
-        if (!jaw.is_empty() && !jaw.0.is_empty()) {
-            jaw_pt = jaw.0[!!(jaw.0.len() / 2)];
+        if (!jaw.is_empty() && !jaw[0].is_empty()) {
+            jaw_pt = jaw[0][!!(jaw[0].len() / 2)];
         } else {
             jaw_pt = curve1[8];
         }
@@ -1056,7 +1217,7 @@ pub fn fish_head(
         curve0[curve0.len() - 1],
     ];
     outline_l.extend(curve2);
-    outline_l.extend([curve1.0, (curve1.0 .0, 300.), (0., 300.)]);
+    outline_l.extend([curve1[0], (curve1[0].0, 300.), (0., 300.)]);
 
     return (
         outline_l,
@@ -1133,7 +1294,7 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
     outline.extend(curve1.clone().into_iter().rev());
     let sh = shade_shape(&outline, Some(8.), Some(-12.), Some(-12.));
 
-    let mut pattern_func: Option<Box<dyn Fn(f64, f64) -> bool>> = None;
+    let mut pattern_func: Option<Rc<dyn Fn((f64, f64)) -> bool>> = None;
     if (arg.pattern_type == 0) {
         //none
     } else if (arg.pattern_type == 1) {
@@ -1142,11 +1303,11 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
         // };
         pattern_func = Some(todo!("pattern_dot(arg.pattern_scale)"));
     } else if (arg.pattern_type == 2) {
-        pattern_func = Some(Box::new(|x, y| {
+        pattern_func = Some(Rc::new(|(x, y)| {
             (noise(x * 0.1, Some(y * 0.1), None) * f64::max(0.35, (y - 10.) / 280.)) < 0.2
         }));
     } else if (arg.pattern_type == 3) {
-        pattern_func = Some(Box::new(|x, y| {
+        pattern_func = Some(Rc::new(move |(x, y)| {
             let dx = noise(x * 0.01, Some(y * 0.01), None) * 30.;
             ((x + dx) / (30. * arg.pattern_scale)).trunc() as i64 % 2 == 1
         }));
@@ -1156,13 +1317,13 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
 
     let bd;
     if (arg.scale_type == 0) {
-        bd = fish_body_a(curve0, curve1, arg.scale_scale, pattern_func);
+        bd = fish_body_a(&curve0, &curve1, arg.scale_scale, pattern_func);
     } else if (arg.scale_type == 1) {
-        bd = fish_body_b(curve0, curve1, arg.scale_scale, pattern_func);
+        bd = todo!("fish_body_b(curve0, curve1, arg.scale_scale, pattern_func)");
     } else if (arg.scale_type == 2) {
-        bd = fish_body_c(curve0, curve1, arg.scale_scale);
+        bd = todo!("fish_body_c(curve0, curve1, arg.scale_scale)");
     } else if (arg.scale_type == 3) {
-        bd = fish_body_d(curve0, curve1, arg.scale_scale);
+        bd = todo!("fish_body_d(curve0, curve1, arg.scale_scale)");
     }
 
     let mut f0_func: Box<dyn Fn(f64) -> f64>;
@@ -1499,7 +1660,7 @@ pub fn cleanup(polylines: Vec<Polyline>) -> Vec<Vec<(f64, f64)>> {
             continue;
         }
         if (polylines[i].len() == 2) {
-            if (dist(polylines[i].0, polylines[i].1) < 0.9) {
+            if (dist(polylines[i][0], polylines[i][1]) < 0.9) {
                 polylines.splice(i..1, []);
                 continue;
             }
