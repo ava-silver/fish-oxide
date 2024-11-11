@@ -195,11 +195,11 @@ pub fn squama_mesh(
             whs.push((dw, dh));
         }
     }
-
-    for j in 1..m - 1 {
+    let mut j = 1;
+    while j < m as i64 - 1 {
         for i in 1..n - 1 {
-            let (x, y) = pts[i * m + j];
-            let (dw, dh) = whs[i * m + j];
+            let (x, y) = pts[i * m + j as usize];
+            let (dw, dh) = whs[i * m + j as usize];
             let q = trsl_poly(&squama_mask(dw, dh), x, y);
             let p: Vec<Polyline> = squama_func((x, y), (dw, dh))
                 .into_iter()
@@ -218,15 +218,15 @@ pub fn squama_mesh(
             }
         }
         for i in 1..n - 1 {
-            let a = pts[i * m + j];
-            let b = pts[i * m + j + 1];
-            let c = pts[(i + 1) * m + j];
-            let d = pts[(i + 1) * m + j + 1];
+            let a = pts[i * m + j as usize];
+            let b = pts[i * m + j as usize + 1];
+            let c = pts[(i + 1) * m + j as usize];
+            let d = pts[(i + 1) * m + j as usize + 1];
 
-            let (dwa, dha) = whs[i * m + j];
-            let (dwb, dhb) = whs[i * m + j + 1];
-            let (dwc, dhc) = whs[(i + 1) * m + j];
-            let (dwd, dhd) = whs[(i + 1) * m + j + 1];
+            let (dwa, dha) = whs[i * m + j as usize];
+            let (dwb, dhb) = whs[i * m + j as usize + 1];
+            let (dwc, dhc) = whs[(i + 1) * m + j as usize];
+            let (dwd, dhd) = whs[(i + 1) * m + j as usize + 1];
 
             let (x, y) = ((a.0 + b.0 + c.0 + d.0) / 4., (a.1 + b.1 + c.1 + d.1) / 4.);
             let (mut dw, dh) = ((dwa + dwb + dwc + dwd) / 4., (dha + dhb + dhc + dhd) / 4.);
@@ -249,6 +249,7 @@ pub fn squama_mesh(
                 }
             }
         }
+        j += 1;
     }
     // for i in 0..n-1 {
     //   for j in 0..m-1; j++){

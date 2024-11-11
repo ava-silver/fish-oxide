@@ -720,32 +720,33 @@ pub fn smalldot_shape(poly,scale=1){
   }
   return clip_multi(out,poly).clip;
 }
-
-pub fn isect_circ_line(cx,cy,r,x0,y0,x1,y1){
-  //https://stackoverflow.com/a/1084899
-  let dx = x1-x0;
-  let dy = y1-y0;
-  let fx = x0-cx;
-  let fy = y0-cy;
-  let a = dx*dx+dy*dy;
-  let b = 2*(fx*dx+fy*dy);
-  let c = (fx*fx+fy*fy)-r*r;
-  let discriminant = b*b-4*a*c;
-  if (discriminant<0){
-    return None;
-  }
-  discriminant = Math.sqrt(discriminant);
-  let t0 = (-b - discriminant)/(2*a);
-  if (0 <= t0 && t0 <= 1){
-    return t0;
-  }
-  let t = (-b + discriminant)/(2*a);
-  if (t > 1 || t < 0){
-    return None;
-  }
-  return t;
-}
 */
+
+pub fn isect_circ_line((cx, cy): Point, r: f64, (x0, y0): Point, (x1, y1): Point) -> Option<f64> {
+    //https://stackoverflow.com/a/1084899
+    let dx = x1 - x0;
+    let dy = y1 - y0;
+    let fx = x0 - cx;
+    let fy = y0 - cy;
+    let a = dx * dx + dy * dy;
+    let b = 2. * (fx * dx + fy * dy);
+    let c = (fx * fx + fy * fy) - r * r;
+    let mut discriminant = b * b - 4. * a * c;
+    if (discriminant < 0.) {
+        return None;
+    }
+    discriminant = discriminant.sqrt();
+    let t0 = (-b - discriminant) / (2. * a);
+    if (0. <= t0 && t0 <= 1.) {
+        return Some(t0);
+    }
+    let t = (-b + discriminant) / (2. * a);
+    if (t > 1. || t < 0.) {
+        return None;
+    }
+    return Some(t);
+}
+
 pub fn resample(polyline_slice: &[Point], step: f64) -> Vec<Point> {
     let mut polyline = polyline_slice.to_vec();
     if (polyline_slice.len() < 2) {
@@ -786,7 +787,7 @@ pub fn resample(polyline_slice: &[Point], step: f64) -> Vec<Point> {
             if (b.0 == c.0 && b.1 == c.1) {
                 continue;
             }
-            let t_opt: Option<f64> = todo!("isect_circ_line(rpx, rpy, step, b.0, b.1, c.0, c.1)");
+            let t_opt: Option<f64> = isect_circ_line((rpx, rpy), step, b, c);
             let Some(t) = t_opt else {
                 continue;
             };
