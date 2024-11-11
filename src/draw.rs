@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    custom_rand::{deviate, noise, rand, randf},
+    custom_rand::{deviate, noise, rand},
     geometry::{
         binclip_multi, clip, clip_multi, dist, fill_shape, get_boundingbox, lerp, lerp2d,
         poly_union, pt_seg_dist, resample, shade_shape, trsl_poly, vein_shape, Point, Polyline,
@@ -139,12 +139,12 @@ fn squama(w: f64, h: f64, m_opt: Option<usize>) -> Vec<Polyline> {
         let t = i as f64 / (m - 1) as f64;
         q.push(vec![
             (
-                -w * 0.3 + (randf() - 0.5),
-                -h * 0.2 + t * h * 0.4 + (randf() - 0.5),
+                -w * 0.3 + (rand() - 0.5),
+                -h * 0.2 + t * h * 0.4 + (rand() - 0.5),
             ),
             (
-                w * 0.5 + (randf() - 0.5),
-                -h * 0.3 + t * h * 0.6 + (randf() - 0.5),
+                w * 0.5 + (rand() - 0.5),
+                -h * 0.3 + t * h * 0.6 + (rand() - 0.5),
             ),
         ]);
     }
@@ -307,7 +307,7 @@ fn fish_body_a(
         .collect();
     let o0 = clip_multi(&sq, &outline2).clip;
     let mut o1 = clip_multi(&o0, &outline3);
-    o1.dont_clip = o1.dont_clip.into_iter().filter(|x| randf() < 0.6).collect();
+    o1.dont_clip = o1.dont_clip.into_iter().filter(|x| rand() < 0.6).collect();
     let mut curve1_rev = curve1.clone();
 
     curve1_rev.reverse();
@@ -485,7 +485,7 @@ pub fn fin_a(
     curve: &Polyline,
     ang0: f64,
     ang1: f64,
-    func: fn(f64) -> f64,
+    func: Box<dyn Fn(f64) -> f64>,
     clip_root_opt: Option<bool>,
     curvature0_opt: Option<f64>,
     curvature1_opt: Option<f64>,
@@ -549,8 +549,8 @@ pub fn fin_a(
         } else {
             out0.push(p[p.len() - 1]);
             // if (i % 2){
-            let q = &p[(if clip_root { (rand() * 4) as usize } else { 0 })
-                ..(2.max((p.len() as f64 * (randf() * 0.5 + 0.5)) as usize))];
+            let q = &p[(if clip_root { (rand() * 4.) as usize } else { 0 })
+                ..(2.max((p.len() as f64 * (rand() * 0.5 + 0.5)) as usize))];
             if (!q.is_empty()) {
                 out1.push(q.iter().map(|x| *x).collect());
             }
@@ -775,17 +775,17 @@ pub fn fin_adipose(curve: &Polyline, dx: f64, dy: f64, r: f64) -> (Polyline, Vec
         .collect();
     let mut out1 = clip(&trsl_poly(&out0, 0., 4.), &cc).clip;
     fn shape((x, y): Point, t: usize) -> bool {
-        randf() < (t as f64 * PI).sin()
+        rand() < (t as f64 * PI).sin()
     }
     out1 = binclip_multi(&out1, shape).clip;
     return (cc, vec![out0].into_iter().chain(out1).collect());
 }
 
 pub fn fish_lip((mut x0, mut y0): Point, (mut x1, mut y1): Point, w: f64) -> Polyline {
-    x0 += randf() * 0.001 - 0.0005;
-    y0 += randf() * 0.001 - 0.0005;
-    x1 += randf() * 0.001 - 0.0005;
-    y1 += randf() * 0.001 - 0.0005;
+    x0 += rand() * 0.001 - 0.0005;
+    y0 += rand() * 0.001 - 0.0005;
+    x1 += rand() * 0.001 - 0.0005;
+    y1 += rand() * 0.001 - 0.0005;
     let h = dist((x0, y0), (x1, y1));
     let a0 = f64::atan2(y1 - y0, x1 - x0);
     let n = 10;
@@ -964,7 +964,7 @@ pub fn fish_eye_b(ex: f64, ey: f64, rad: f64) -> (Polyline, Vec<Polyline>) {
 pub fn barbel((mut x, mut y): Point, n: usize, mut ang: f64, dd_opt: Option<f64>) -> Polyline {
     let dd = dd_opt.unwrap_or(3.);
     let mut curve = vec![(x, y)];
-    let sd = randf() * PI * 2.;
+    let sd = rand() * PI * 2.;
     let mut ar = 1.;
     for i in 0..n {
         x += f64::cos(ang) * dd;
@@ -1178,31 +1178,31 @@ pub fn fish_head(
             &barbel(
                 jaw_pt,
                 arg.beard_length,
-                PI * 0.6 + randf() * 0.4 - 0.2,
+                PI * 0.6 + rand() * 0.4 - 0.2,
                 None,
             ),
-            randf() * 1. - 0.5,
-            randf() * 1. - 0.5,
+            rand() * 1. - 0.5,
+            rand() * 1. - 0.5,
         );
         let bb2 = trsl_poly(
             &barbel(
                 jaw_pt,
                 arg.beard_length,
-                PI * 0.6 + randf() * 0.4 - 0.2,
+                PI * 0.6 + rand() * 0.4 - 0.2,
                 None,
             ),
-            randf() * 1. - 0.5,
-            randf() * 1. - 0.5,
+            rand() * 1. - 0.5,
+            rand() * 1. - 0.5,
         );
         let bb3 = trsl_poly(
             &barbel(
                 jaw_pt,
                 arg.beard_length,
-                PI * 0.6 + randf() * 0.4 - 0.2,
+                PI * 0.6 + rand() * 0.4 - 0.2,
                 None,
             ),
-            randf() * 1. - 0.5,
-            randf() * 1. - 0.5,
+            rand() * 1. - 0.5,
+            rand() * 1. - 0.5,
         );
 
         let mut bb3c = clip_multi(&vec![bb3], &bb2).dont_clip;
@@ -1331,28 +1331,42 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
     let mut f0_a0;
     let mut f0_a1;
     let mut f0_cv;
+    let dl = arg.dorsal_length;
     if (arg.dorsal_type == 0) {
         f0_a0 = 0.2 + deviate(0.05);
         f0_a1 = 0.3 + deviate(0.05);
         f0_cv = 0.;
-        f0_func = Box::new(|t| {
-            (0.3 + noise(t * 3., None, None) * 0.7) * arg.dorsal_length * f64::sin(t * PI).powf(0.5)
+
+        f0_func = Box::new(move |t| {
+            (0.3 + noise(t * 3., None, None) * 0.7) * dl * f64::sin(t * PI).powf(0.5)
         });
     } else if (arg.dorsal_type == 1) {
         f0_a0 = 0.6 + deviate(0.05);
         f0_a1 = 0.3 + deviate(0.05);
         f0_cv = arg.dorsal_length / 8.;
-        f0_func = Box::new(|t| arg.dorsal_length * ((f64::powi(t - 1., 2)) * 0.5 + (1. - t) * 0.5));
+        f0_func = Box::new(move |t| dl * ((f64::powi(t - 1., 2)) * 0.5 + (1. - t) * 0.5));
+    } else {
+        unimplemented!();
     }
     let mut f0_curve;
-    let mut c0: Vec<Polyline>;
+    let mut c0: Polyline;
     let mut f0: Vec<Polyline>;
     if (arg.dorsal_texture_type == 0) {
         f0_curve = resample(&curve0[arg.dorsal_start..arg.dorsal_end], 5.);
-        todo!("let (c0, f0) = fin_a(f0_curve,f0_a0,f0_a1,f0_func,false,f0_cv,0)");
+        (c0, f0) = fin_a(
+            &f0_curve,
+            f0_a0,
+            f0_a1,
+            f0_func,
+            Some(false),
+            Some(f0_cv),
+            Some(0.),
+            None,
+        );
     } else {
         f0_curve = resample(&curve0[arg.dorsal_start..arg.dorsal_end], 15.);
         todo!("let (c0, f0) = fin_b(f0_curve,f0_a0,f0_a1,f0_func)");
+        (c0, f0) = (vec![], vec![]);
     }
     f0 = clip_multi(&f0, &trsl_poly(&outline, 0., 0.001)).dont_clip;
 

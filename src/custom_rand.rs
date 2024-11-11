@@ -1,4 +1,4 @@
-use rand::{seq::SliceRandom, thread_rng};
+use rand::{seq::SliceRandom, thread_rng, Rng};
 use std::{
     f64::consts::PI,
     sync::{
@@ -9,17 +9,14 @@ use std::{
 
 static JSR: AtomicU64 = AtomicU64::new(0x5EED);
 
-pub fn rand() -> u64 {
+pub fn rand() -> f64 {
+    return thread_rng().gen();
     let mut reg = JSR.load(Ordering::Acquire);
     reg ^= reg << 17;
     reg ^= reg >> 13;
     reg ^= reg << 5;
     JSR.store(reg, Ordering::Release);
-    return (reg >> 0) / 4294967295;
-}
-
-pub fn randf() -> f64 {
-    return rand() as f64;
+    return (reg >> 0) as f64 / 4294967295.;
 }
 
 pub fn seed_rand(seed: u64) {
@@ -37,7 +34,7 @@ pub fn scaled_cosine(i: f64) -> f64 {
     return 0.5 * (1.0 - f64::cos(i * PI));
 }
 
-static PERLIN: LazyLock<Vec<u64>> = LazyLock::new(|| (0..=PERLIN_SIZE).map(|_| rand()).collect());
+static PERLIN: LazyLock<Vec<f64>> = LazyLock::new(|| (0..=PERLIN_SIZE).map(|_| rand()).collect());
 
 pub fn noise(mut x: f64, y_opt: Option<f64>, z_opt: Option<f64>) -> f64 {
     x = x.abs();
@@ -65,16 +62,16 @@ pub fn noise(mut x: f64, y_opt: Option<f64>, z_opt: Option<f64>) -> f64 {
         let mut of = xi + ((yi) << PERLIN_YWRAPB) + ((zi) << PERLIN_ZWRAPB);
         rxf = scaled_cosine(xf);
         ryf = scaled_cosine(yf);
-        n1 = PERLIN[(of & PERLIN_SIZE) as usize] as f64;
-        n1 += rxf * (PERLIN[((of + 1) & PERLIN_SIZE) as usize] as f64 - n1);
-        n2 = PERLIN[((of + PERLIN_YWRAP) & PERLIN_SIZE) as usize] as f64;
-        n2 += rxf * (PERLIN[((of + PERLIN_YWRAP + 1) & PERLIN_SIZE) as usize] as f64 - n2);
+        n1 = PERLIN[(of & PERLIN_SIZE) as usize];
+        n1 += rxf * (PERLIN[((of + 1) & PERLIN_SIZE) as usize] - n1);
+        n2 = PERLIN[((of + PERLIN_YWRAP) & PERLIN_SIZE) as usize];
+        n2 += rxf * (PERLIN[((of + PERLIN_YWRAP + 1) & PERLIN_SIZE) as usize] - n2);
         n1 += ryf * (n2 - n1);
         of += PERLIN_ZWRAP;
-        n2 = PERLIN[(of & PERLIN_SIZE) as usize] as f64;
-        n2 += rxf * (PERLIN[((of + 1) & PERLIN_SIZE) as usize] as f64 - n2);
-        n3 = PERLIN[((of + PERLIN_YWRAP) & PERLIN_SIZE) as usize] as f64;
-        n3 += rxf * (PERLIN[((of + PERLIN_YWRAP + 1) & PERLIN_SIZE) as usize] as f64 - n3);
+        n2 = PERLIN[(of & PERLIN_SIZE) as usize];
+        n2 += rxf * (PERLIN[((of + 1) & PERLIN_SIZE) as usize] - n2);
+        n3 = PERLIN[((of + PERLIN_YWRAP) & PERLIN_SIZE) as usize];
+        n3 += rxf * (PERLIN[((of + PERLIN_YWRAP + 1) & PERLIN_SIZE) as usize] - n3);
         n2 += ryf * (n3 - n2);
         n1 += scaled_cosine(zf) * (n2 - n1);
         r += n1 * ampl;
@@ -102,16 +99,16 @@ pub fn noise(mut x: f64, y_opt: Option<f64>, z_opt: Option<f64>) -> f64 {
     return r;
 }
 
-pub fn choice<'a, T>(opts: &'a [T], percs_opt: Option<&[u32]>) -> &'a T {
+pub fn choice<'a, T>(opts: &'a [T], percs_opt: Option<&[f64]>) -> &'a T {
     return opts.choose(&mut thread_rng()).unwrap();
-    let default_percs = opts.iter().map(|_| 1).collect::<Vec<_>>();
+    let default_percs = opts.iter().map(|_| 1.).collect::<Vec<_>>();
     let percs = percs_opt.unwrap_or(&default_percs);
     let mut s = percs.iter().sum();
-    let mut r = rand() * s as u64;
-    s = 0;
+    let mut r = rand() * s;
+    s = 0.;
     for i in 0..percs.len() {
         s += percs[i];
-        if (r <= s as u64) {
+        if (r <= s) {
             return &opts[i];
         }
     }

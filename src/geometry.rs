@@ -1,4 +1,4 @@
-use crate::custom_rand::{noise, rand, randf};
+use crate::custom_rand::{noise, rand};
 use std::{
     collections::HashMap,
     f64::consts::{E, PI},
@@ -601,7 +601,7 @@ pub fn shade_shape(
         let line = &lines[i];
         let mut a = line[0];
         let mut b = line[1];
-        let s = (randf()) * 0.5;
+        let s = (rand()) * 0.5;
         if dy > 0. {
             a = lerp2d(a, b, s);
             lines[i][0] = a;
@@ -670,8 +670,8 @@ pub fn vein_shape(poly: &Polyline, n_opt: Option<i64>) -> Vec<Polyline> {
     let bbox = get_boundingbox(poly);
     let mut out = vec![];
     for i in 0..n {
-        let mut x = bbox.x + randf() * bbox.w;
-        let mut y = bbox.y + randf() * bbox.h;
+        let mut x = bbox.x + rand() * bbox.w;
+        let mut y = bbox.y + rand() * bbox.h;
         let mut o = vec![(x, y)];
         for j in 0..15 {
             let dx = (noise(x * 0.1, Some(y * 0.1), Some(7.)) - 0.5) * 4.;
