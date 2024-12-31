@@ -581,108 +581,108 @@ pub fn fin_a(
 /*
 pub fn fin_b(curve: &Polyline,ang0: f64,ang1: f64,func: fn(f64) -> f64, dark_opt: Option<f64>){
     let dark = dark_opt.unwrap_or(1.);
-  let angs = [];
+  let mut angs = vec![];
   for i in 0..curve.len() {
 
     if (i == 0){
-      angs.push( f64::atan2(curve[i+1].1-curve[i].1, curve[i+1].0-curve[i].0) - PI/2 );
+      angs.push( f64::atan2(curve[i+1].1-curve[i].1, curve[i+1].1-curve[i].1) - PI/2. );
     }else if (i == curve.len()-1){
-      angs.push( f64::atan2(curve[i].1-curve[i-1].1, curve[i].0-curve[i-1].0) - PI/2 );
+      angs.push( f64::atan2(curve[i].1-curve[i-1].1, curve[i].1-curve[i-1].1) - PI/2. );
     }else{
-      let a0 = f64::atan2(curve[i-1].1-curve[i].1, curve[i-1].0-curve[i].0);
-      let a1 = f64::atan2(curve[i+1].1-curve[i].1, curve[i+1].0-curve[i].0);
+      let a0 = f64::atan2(curve[i-1].1-curve[i].1, curve[i-1].1-curve[i].1);
+      let mut a1 = f64::atan2(curve[i+1].1-curve[i].1, curve[i+1].1-curve[i].1);
       while (a1 > a0){
-        a1 -= PI*2;
+        a1 -= PI*2.;
       }
-      a1 += PI*2;
-      let a = (a0+a1)/2;
+      a1 += PI*2.;
+      let a = (a0+a1)/2.;
       angs.push(a);
     }
   }
 
-  let out0 = [];
-  let out1 = [];
-  let out2 = [];
-  let out3 = [];
+  let mut out0 = vec![];
+  let mut out1 = vec![];
+  let mut out2 = vec![];
+  let mut out3 = vec![];
   for i in 0..curve.len() {
-    let t = i/(curve.len()-1);
+    let t = (i/(curve.len()-1)) as f64;
     let aa = lerp(ang0,ang1,t);
     let a = angs[i]+aa;
     let w = func(t);
 
-    let [x0,y0] = curve[i];
+    let (x0,y0) = curve[i];
     let x1 = x0 + f64::cos(a)*w;
     let y1 = y0 + f64::sin(a)*w;
 
-    let b = [
-      x1 + 0.5 * f64::cos(a-PI/2),
-      y1 + 0.5 * f64::sin(a-PI/2),
-    ];
-    let c = [
-      x1 + 0.5 * f64::cos(a+PI/2),
-      y1 + 0.5 * f64::sin(a+PI/2),
-    ];
+    let b = (
+      x1 + 0.5 * f64::cos(a-PI/2.),
+      y1 + 0.5 * f64::sin(a-PI/2.)
+    );
+    let c = (
+      x1 + 0.5 * f64::cos(a+PI/2.),
+      y1 + 0.5 * f64::sin(a+PI/2.)
+    );
 
-    let p = [
-      curve[i].0 + 1.8 * f64::cos(a-PI/2),
-      curve[i].1 + 1.8 * f64::sin(a-PI/2),
-    ];
-    let q = [
-      curve[i].0 + 1.8 * f64::cos(a+PI/2),
-      curve[i].1 + 1.8 * f64::sin(a+PI/2),
-    ];
-    out1.push([x1,y1]);
-    out0.push([p,b,c,q]);
+    let p = (
+      curve[i].0 + 1.8 * f64::cos(a-PI/2.),
+      curve[i].1 + 1.8 * f64::sin(a-PI/2.)
+    );
+    let q = (
+      curve[i].0 + 1.8 * f64::cos(a+PI/2.),
+      curve[i].1 + 1.8 * f64::sin(a+PI/2.),
+    );
+    out1.push((x1,y1));
+    out0.push(vec![p,b,c,q]);
   }
 
   let n = 10;
   for i in 0..curve.len()-1 {
 
-    let [_,__,a0,q0] = out0[i];
-    let [p1,a1,___,____] = out0[i+1];
+    let (a0,q0) = (out0[i][2],out0[i][3]);
+    let (p1,a1) = (out0[i+1][0],out0[i+1][1]);
 
-    let b = lerp2d(...a0,...q0,0.1);
-    let c = lerp2d(...a1,...p1,0.1);
+    let b = lerp2d(a0,q0,0.1);
+    let c = lerp2d(a1,p1,0.1);
 
-    let o = [];
+    let mut o = vec![];
     let ang = f64::atan2(c.1-b.1,c.0-b.0);
 
-    for j in 0..n; j++){
-      let t = j/(n-1);
-      let d = f64::sin(t*PI)*2;
-      let a = lerp2d(...b,...c,t);
-      o.push([
-        a.0 + f64::cos(ang+PI/2)*d,
-        a.1 + f64::sin(ang+PI/2)*d,
-      ])
+    for j in 0..n{
+      let t =( j/(n-1)) as f64;
+      let d = f64::sin(t*PI)*2.;
+      let a = lerp2d(b,c,t);
+      o.push((
+        a.0 + f64::cos(ang+PI/2.)*d,
+        a.1 + f64::sin(ang+PI/2.)*d
+      ))
     }
 
     // out2.push([b,c]);
-    out2.push(o);
+    out2.push(o.clone());
 
-    let m = !!( f64::min(dist(...a0,...q0),dist(...a1,...p1) ) /10 * dark);
-    let e = lerp2d(...curve[i],...curve[i+1],0.5);
-    for k in 0; k < m; k ++){
-      let p = [];
-      let s= k/m*0.7;
-      for j in 1; j < n-1; j++){
-        p.push(lerp2d(...o[j],...e,s));
+    let m = ( f64::min(dist(a0,q0),dist(a1,p1) ) /10. * dark) as u64;
+    let e = lerp2d(curve[i],curve[i+1],0.5);
+    for k in 0..m{
+      let mut p = vec![];
+      let s= k as f64/m as f64 *0.7;
+      for j in 1..n-1{
+        p.push(lerp2d(o[j],e,s));
       }
       out3.push(p);
     }
   }
 
-  let out4 = [];
+  let mut out4 =  vec![];
   if (out0.len() > 1){
-    let clipper = out0.0;
-    out4.push(out0.0)
-    for i in 1; i < out0.len() {
-      out4.push(...clip(out0[i],clipper).dont_clip);
-      clipper = poly_union(clipper,out0[i]);
+    let mut clipper = out0[0].clone();
+    out4.push(out0[0].clone());
+    for i in 1..out0.len() {
+      out4.extend(clip(&out0[i],&clipper).dont_clip);
+      clipper = poly_union(&clipper,&out0[i], None);
     }
   }
 
-  return [out2.flat().concat(curve.slice().reverse()),out4.concat(out2).concat(out3)];
+  return (out2.clone().into_iter().flatten().chain(curve.clone().into_iter().rev()).collect(),out4.into_iter().chain(out2).chain(out3).collect());
 }
 */
 
@@ -843,7 +843,7 @@ pub fn fish_teeth(
             a.1 + f64::sin(ang + dir as f64 * (PI / 2. + 0.15)) * w,
         );
         out.push(vec![c, e, g, f, d])
-        // out.push(barbel(...a,10,ang+dir*PI/2))
+        // out.push(barbel(...a,10,ang+dir*PI/2.))
     }
     return out;
 }
