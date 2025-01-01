@@ -149,8 +149,10 @@ fn squama(w: f64, h: f64, m_opt: Option<usize>) -> Vec<Polyline> {
     for i in 0..n {
         let t = i as f64 / (n - 1) as f64;
         let a = t * PI + PI / 2.;
-        let x = -f64::powf(f64::cos(a).abs(), 1.4) * w;
-        let y = f64::powf(f64::sin(a).abs(), 1.4) * h;
+        let cos = a.cos();
+        let sin = a.sin();
+        let x = cos.abs().powf(1.4).copysign(-cos) * w;
+        let y = sin.abs().powf(1.4).copysign(sin) * h;
         p.push((x, y));
     }
     assert_not_nan(&p);
