@@ -18,6 +18,7 @@ pub fn lerp2d((x0, y0): Point, (x1, y1): Point, t: f64) -> Point {
     (x0 * (1. - t) + x1 * t, y0 * (1. - t) + y1 * t)
 }
 
+#[derive(Debug, Clone)]
 pub struct BoundingBox {
     pub x: f64,
     pub y: f64,

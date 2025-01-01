@@ -14,6 +14,20 @@ use crate::{
     params::Params,
 };
 
+pub fn assert_not_nans(p: &Vec<Polyline>) {
+    if p.iter()
+        .any(|v| v.iter().any(|(x, y)| x.is_nan() || y.is_nan()))
+    {
+        panic!("NaN detected");
+    }
+}
+
+pub fn assert_not_nan(p: &Polyline) {
+    if p.iter().any(|(x, y)| x.is_nan() || y.is_nan()) {
+        panic!("NaN detected");
+    }
+}
+
 pub fn draw_svg(polylines: Vec<Polyline>) -> String {
     let mut o =
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"520\" height=\"320\">".to_owned();
@@ -135,10 +149,11 @@ fn squama(w: f64, h: f64, m_opt: Option<usize>) -> Vec<Polyline> {
     for i in 0..n {
         let t = i as f64 / (n - 1) as f64;
         let a = t * PI + PI / 2.;
-        let x = -f64::powf(f64::cos(a), 1.4) * w;
-        let y = f64::powf(f64::sin(a), 1.4) * h;
+        let x = -f64::powf(f64::cos(a).abs(), 1.4) * w;
+        let y = f64::powf(f64::sin(a).abs(), 1.4) * h;
         p.push((x, y));
     }
+    assert_not_nan(&p);
     let mut q = vec![p];
     for i in 0..m {
         let t = i as f64 / (m - 1) as f64;
@@ -206,18 +221,18 @@ pub fn squama_mesh(
             let (x, y) = pts[i * m + j as usize];
             let (dw, dh) = whs[i * m + j as usize];
             let q = trsl_poly(&squama_mask(dw, dh), x, y);
-            let p: Vec<Polyline> = squama_func((x, y), (dw, dh))
-                .into_iter()
-                .map(|a| trsl_poly(&a, x, y))
-                .collect();
+            let p = squama_func((x, y), (dw, dh));
+            let p: Vec<Polyline> = p.into_iter().map(|a| trsl_poly(&a, x, y)).collect();
             if (!interclip) {
                 out.extend(p.into_iter());
             } else {
                 if let Some(c) = clipper {
                     out.extend(clip_multi(&p, &c).dont_clip.into_iter());
+                    assert_not_nans(&out);
                     clipper = Some(poly_union(&c, &q, None));
                 } else {
                     out.extend(p.into_iter());
+                    assert_not_nans(&out); // big bad right here
                     clipper = Some(q);
                 }
             }
@@ -247,9 +262,11 @@ pub fn squama_mesh(
             } else {
                 if let Some(c) = clipper {
                     out.extend(clip_multi(&p, &c).dont_clip.into_iter());
+                    assert_not_nans(&out);
                     clipper = Some(poly_union(&c, &q, None));
                 } else {
                     out.extend(p.into_iter());
+                    assert_not_nans(&out);
                     clipper = Some(q);
                 }
             }
@@ -280,6 +297,11 @@ fn fish_body_a(
         curve2.push(lerp2d(curve0[i], curve1[i], 0.95));
         curve3.push(lerp2d(curve0[i], curve1[i], 0.85));
     }
+    assert_not_nan(&curve0);
+    assert_not_nan(&curve1);
+    assert_not_nan(&curve2);
+    assert_not_nan(&curve3);
+
     let outline1: Polyline = curve0
         .clone()
         .into_iter()
@@ -306,10 +328,15 @@ fn fish_body_a(
     } else {
         Box::new(|(x, y), (w, h)| squama(w, h, None))
     };
-    let sq = squama_mesh(m, n + 3, (uw, uh), funky, (uw * 3., uh * 3.), Some(true))
+
+    let mut sq = squama_mesh(m, n + 3, (uw, uh), funky, (uw * 3., uh * 3.), Some(true));
+    assert_not_nans(&sq);
+
+    sq = sq
         .into_iter()
         .map(|a| trsl_poly(&a, bbox.x, bbox.y - uh * 1.5))
         .collect();
+    // assert_not_nans(&sq);
     let o0 = clip_multi(&sq, &outline2).clip;
     let mut o1 = clip_multi(&o0, &outline3);
     o1.dont_clip = o1.dont_clip.into_iter().filter(|x| rand() < 0.6).collect();
@@ -1299,6 +1326,7 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
     let mut outline = curve0.clone();
     outline.extend(curve1.clone().into_iter().rev());
     let mut sh = shade_shape(&outline, Some(8.), Some(-12.), Some(-12.));
+    assert_not_nans(&sh);
 
     let mut pattern_func: Option<Rc<dyn Fn((f64, f64)) -> bool>> = None;
     if (arg.pattern_type == 0) {
@@ -1333,6 +1361,7 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
     } else {
         unreachable!();
     }
+    // assert_not_nans(&bd);
 
     let mut f0_func: Box<dyn Fn(f64) -> f64>;
     let mut f0_a0;
@@ -1376,6 +1405,7 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
         (c0, f0) = (vec![], vec![]);
     }
     f0 = clip_multi(&f0, &trsl_poly(&outline, 0., 0.001)).dont_clip;
+    // assert_not_nans(&f0);
 
     let mut f1_curve = vec![];
     let mut f1_func: Box<dyn Fn(f64) -> f64>;
@@ -1430,6 +1460,7 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
         todo!("let (c1, f1) = fin_b(f1_curve,f1_a0,f1_a1,f1_func,0.3)");
     }
     bd = clip_multi(&bd, &c1).dont_clip;
+    // assert_not_nans(&bd);
 
     let f2_curve;
     let mut f2_func: Box<dyn Fn(f64) -> f64>;
