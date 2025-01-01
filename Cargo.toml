@@ -2,6 +2,13 @@
 name = "fish-oxide"
 version = "0.1.0"
 edition = "2021"
+description = "A port of fishdraw to rust"
+license = "MIT"
+readme = "readme.md"
+authors = ["Ava Silver <ava@avasilver.dev>"]
+repository = "https://github.com/ava-silver/fish-oxide"
+categories = ["command-line-utilities", "graphics", "multimedia::images"]
+im-a-teapot = false
 
 [dependencies]
 clap = { version = "4.5.23", features = ["derive"] }
