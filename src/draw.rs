@@ -7,8 +7,8 @@ use crate::{
     custom_rand::{deviate, noise, rand},
     geometry::{
         binclip_multi, clip, clip_multi, dist, fill_shape, get_boundingbox, lerp, lerp2d,
-        poly_union, pt_seg_dist, resample, scl_poly, shade_shape, shr_poly, trsl_poly, vein_shape,
-        Point, Polyline,
+        poly_union, pow, pt_seg_dist, resample, scl_poly, shade_shape, shr_poly, trsl_poly,
+        vein_shape, Point, Polyline,
     },
     hershey::compile_hershey,
     params::Params,
@@ -135,8 +135,8 @@ fn squama_mask(w: f64, h: f64) -> Polyline {
     for i in 0..n {
         let t = i / n;
         let a = t as f64 * PI * 2.;
-        let x = -f64::powf(a.cos(), 1.3) * w;
-        let y = f64::powf(a.sin(), 1.3) * h;
+        let x = -pow(a.cos(), 1.3) * w;
+        let y = pow(a.sin(), 1.3) * h;
         p.push((x, y));
     }
     return p;
@@ -397,7 +397,7 @@ pub fn fish_body_b(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_
 
 
 pub fn ogee(x: f64) -> f64{
-  return 4. * f64::powf(x-0.5,3) + 0.5;
+  return 4. * pow(x-0.5,3) + 0.5;
 }
 
 pub fn fish_body_c(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_func: Option<impl Fn(Point) -> f64>) -> Vec<Polyline>{
@@ -1057,8 +1057,8 @@ pub fn fish_head(
     for i in 0..n {
         let t = i as f64 / (n as f64 - 1.);
         let a = PI / 2. * t;
-        let x = x1 - f64::powf(f64::cos(a), 1.5) * (x1 - x0);
-        let y = y0 - f64::powf(f64::sin(a), 1.5) * (y0 - y1);
+        let x = x1 - pow(f64::cos(a), 1.5) * (x1 - x0);
+        let y = y0 - pow(f64::sin(a), 1.5) * (y0 - y1);
         // let x = lerp(x0,x1,t);
         // let y = lerp(y0,y1,t);
 
@@ -1069,8 +1069,8 @@ pub fn fish_head(
     for i in 0..n {
         let t = i as f64 / (n as f64 - 1.);
         let a = PI / 2. * t;
-        let x = x2 - f64::powf(f64::cos(a), 0.8) * (x2 - x0);
-        let y = y0 + f64::powf(f64::sin(a), 1.5) * (y2 - y0);
+        let x = x2 - pow(f64::cos(a), 0.8) * (x2 - x0);
+        let y = y0 + pow(f64::sin(a), 1.5) * (y2 - y0);
 
         let dx = (noise(x * 0.01, Some(y * 0.01), Some(9.)) * 40. - 20.) * (1.01 - t);
         let dy = (noise(x * 0.01, Some(y * 0.01), Some(8.)) * 40. - 20.) * (1.01 - t);
@@ -1080,7 +1080,7 @@ pub fn fish_head(
     for i in 1..n - 1 {
         let t = i as f64 / (n as f64 - 1.);
         let p = lerp2d((x1, y1), (x2, y2), t);
-        let s = f64::powf(f64::sin(t * PI), 0.5);
+        let s = pow(f64::sin(t * PI), 0.5);
         let r = noise(t * 2., Some(1.2), None) * s * 20.;
 
         let dx = f64::cos(ang - PI / 2.) * r;

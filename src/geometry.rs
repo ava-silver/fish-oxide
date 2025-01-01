@@ -943,16 +943,16 @@ pub fn poissondisk(W, H, r, samples) {
   };
 }
 
-pub fn pow(a,b){
-  return Math.sign(a) * Math.pow(Math.abs(a),b);
+*/
+pub fn pow(a: f64, b: f64) -> f64 {
+    return a.abs().powf(b).copysign(a);
 }
 
-pub fn gauss2d(x, y){
-  let z0 = exp(-0.5*x*x);
-  let z1 = exp(-0.5*y*y);
-  return z0*z1;
- }
- */
+pub fn gauss2d(x: f64, y: f64) -> f64 {
+    let z0 = f64::exp(-0.5 * x * x);
+    let z1 = f64::exp(-0.5 * y * y);
+    return z0 * z1;
+}
 
 pub fn scl_poly(poly: &Polyline, sx: f64, sy_opt: Option<f64>) -> Polyline {
     let sy = sy_opt.unwrap_or(sx);
