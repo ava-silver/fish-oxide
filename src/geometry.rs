@@ -750,19 +750,19 @@ pub fn isect_circ_line((cx, cy): Point, r: f64, (x0, y0): Point, (x1, y1): Point
 
 pub fn resample(polyline_slice: &[Point], step: f64) -> Vec<Point> {
     let mut polyline = polyline_slice.to_vec();
-    if (polyline_slice.len() < 2) {
+    if polyline_slice.len() < 2 {
         return polyline;
     }
     let mut out = vec![polyline[0]];
-    let mut next = None;
+    let mut next;
     let mut i = 0;
-    while (i < polyline.len() - 1) {
+    while i < polyline.len() - 1 {
         let a = polyline[i];
         let b = polyline[i + 1];
         let dx = b.0 - a.0;
         let dy = b.1 - a.1;
         let d = f64::sqrt(dx * dx + dy * dy);
-        if (d == 0.) {
+        if d == 0. {
             i += 1;
             continue;
         }

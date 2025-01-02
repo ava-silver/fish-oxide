@@ -110,14 +110,14 @@ pub fn binomen() -> String {
 
     let mut name = choice(&data[0], Some(&freq[0])).to_string();
     let mut n = (rand() * 3.).trunc() as usize;
-    for i in 0..n {
+    for _ in 0..n {
         name += &choice(&data[1], Some(&freq[1]));
     }
     name += &choice(&data[2], Some(&freq[2]));
     name += " ";
     name += &choice(&data[3], Some(&freq[3]));
     n = (rand() * 3.).trunc() as usize;
-    for i in 0..n {
+    for _ in 0..n {
         name += &choice(&data[4], Some(&freq[4]));
     }
     name += &choice(&data[5], Some(&freq[5]));
@@ -204,15 +204,15 @@ pub fn compile_hershey(i: i64) -> (i64, i64, Vec<Vec<(f64, f64)>>) {
         todo!();
     };
     let ord_r = 82;
-    let mut bound = &mut entry[3..5].chars();
+    let bound = &mut entry[3..5].chars();
     let xmin = (bound.next().unwrap() as i64) - ord_r;
     let xmax = (bound.next().unwrap() as i64) - ord_r;
     let content = &entry[5..];
     let mut polylines = vec![vec![]];
     let mut j = 0;
-    while (j < content.len()) {
+    while j < content.len() {
         let digit = &content[j..j + 2];
-        if (digit == " R") {
+        if digit == " R" {
             polylines.push(vec![]);
         } else {
             let mut chars = digit.chars();

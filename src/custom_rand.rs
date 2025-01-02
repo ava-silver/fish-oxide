@@ -9,14 +9,29 @@ use std::{
 
 static JSR: AtomicU64 = AtomicU64::new(0x5EED);
 
+pub fn str_to_seed(str: String) -> u32 {
+    let mut n = 1;
+    for (i, c) in str.chars().enumerate() {
+        let x = (c as u32) + 1;
+        n ^= x << (7 + (i % 5));
+        // if (i % 2){
+        n ^= n << 17;
+        n ^= n >> 13;
+        n ^= n << 5;
+        // }
+        n = (n >> 0) % 4294967295;
+    }
+    return n;
+}
+
 pub fn rand() -> f64 {
     return thread_rng().gen();
-    let mut reg = JSR.load(Ordering::Acquire);
-    reg ^= reg << 17;
-    reg ^= reg >> 13;
-    reg ^= reg << 5;
-    JSR.store(reg, Ordering::Release);
-    return (reg >> 0) as f64 / 4294967295.;
+    // let mut reg = JSR.load(Ordering::Acquire);
+    // reg ^= reg << 17;
+    // reg ^= reg >> 13;
+    // reg ^= reg << 5;
+    // JSR.store(reg, Ordering::Release);
+    // return (reg >> 0) as f64 / 4294967295.;
 }
 
 pub fn seed_rand(seed: u64) {
