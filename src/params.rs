@@ -124,7 +124,7 @@ pub fn generate_params() -> Params {
     arg.dorsal_texture_type = 0;
     arg.dorsal_type = *choice(&[0, 1], None);
     arg.dorsal_length = rndtri_f(30., 90., 180.);
-    if (arg.dorsal_type == 0) {
+    if arg.dorsal_type == 0 {
         arg.dorsal_start = !!rndtri(7, 8, 15) as usize;
         arg.dorsal_end = !!rndtri(20, 27, 28) as usize;
     } else {
@@ -134,12 +134,12 @@ pub fn generate_params() -> Params {
     // arg.wing_texture_type = *choice(&[0, 1], None); TODO: fix this
     arg.wing_texture_type = 0;
     arg.wing_type = *choice(&[0, 1], None);
-    if (arg.wing_type == 0) {
+    if arg.wing_type == 0 {
         arg.wing_length = rndtri_f(40., 130., 200.);
     } else {
         arg.wing_length = rndtri_f(40., 150., 350.);
     }
-    if (arg.wing_texture_type == 0) {
+    if arg.wing_texture_type == 0 {
         arg.wing_width = rndtri_f(7., 10., 20.);
         arg.wing_y = rndtri_f(0.45, 0.7, 0.85);
     } else {
@@ -157,7 +157,7 @@ pub fn generate_params() -> Params {
     };
     arg.pelvic_type = *choice(&[0, 1], None);
     arg.pelvic_length = rndtri_f(30., 85., 140.);
-    if (arg.pelvic_type == 0) {
+    if arg.pelvic_type == 0 {
         arg.pelvic_start = !!rndtri(7, 9, 11) as usize;
         arg.pelvic_end = !!rndtri(13, 14, 15) as usize;
     } else {

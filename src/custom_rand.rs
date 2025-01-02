@@ -3,7 +3,7 @@ use std::{
     f64::consts::PI,
     sync::{
         atomic::{AtomicU64, Ordering},
-        LazyLock, Mutex,
+        LazyLock,
     },
 };
 
@@ -123,7 +123,7 @@ pub fn choice<'a, T>(opts: &'a [T], percs_opt: Option<&[f64]>) -> &'a T {
     s = 0.;
     for i in 0..percs.len() {
         s += percs[i];
-        if (r <= s) {
+        if r <= s {
             return &opts[i];
         }
     }
@@ -131,31 +131,31 @@ pub fn choice<'a, T>(opts: &'a [T], percs_opt: Option<&[f64]>) -> &'a T {
 }
 
 pub fn rndtri(a: i64, b: i64, c: i64) -> i64 {
-    let mut s0 = (b - a) / 2;
-    let mut s1 = (c - b) / 2;
-    let mut s = s0 + s1;
-    let mut r = rand() as i64 * s;
-    if (r < s0) {
+    let s0 = (b - a) / 2;
+    let s1 = (c - b) / 2;
+    let s = s0 + s1;
+    let r = rand() as i64 * s;
+    if r < s0 {
         //d * d/(b-a) / 2 = r;
-        let mut d = ((2 * r * (b - a)) as f32).sqrt();
+        let d = ((2 * r * (b - a)) as f32).sqrt();
         return a + d as i64;
     }
     //d * d/(c-b) / 2 = s-r;
-    let mut d = ((2 * (s - r) * (c - b)) as f32).sqrt();
+    let d = ((2 * (s - r) * (c - b)) as f32).sqrt();
     return c - d as i64;
 }
 pub fn rndtri_f(a: f64, b: f64, c: f64) -> f64 {
-    let mut s0 = (b - a) / 2.;
-    let mut s1 = (c - b) / 2.;
-    let mut s = s0 + s1;
-    let mut r = rand() as f64 * s;
-    if (r < s0) {
+    let s0 = (b - a) / 2.;
+    let s1 = (c - b) / 2.;
+    let s = s0 + s1;
+    let r = rand() as f64 * s;
+    if r < s0 {
         //d * d/(b-a) / 2 = r;
-        let mut d = (2. * r * (b - a)).sqrt();
+        let d = (2. * r * (b - a)).sqrt();
         return a + d;
     }
     //d * d/(c-b) / 2 = s-r;
-    let mut d = (2. * (s - r) * (c - b)).sqrt();
+    let d = (2. * (s - r) * (c - b)).sqrt();
     return c - d;
 }
 

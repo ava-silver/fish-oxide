@@ -483,7 +483,7 @@ impl ClipSegments {
 }
 
 pub fn clip(polyline: &Polyline, polygon: &Polyline) -> ClipSegments {
-    if (polyline.is_empty()) {
+    if polyline.is_empty() {
         return ClipSegments::default();
     }
     let zero = seg_isect_poly(
@@ -526,7 +526,7 @@ pub fn clip_multi(polylines: &Vec<Polyline>, polygon: &Polyline) -> ClipSegments
 }
 
 pub fn binclip(polyline: &Polyline, func: fn(Point, usize) -> bool) -> ClipSegments {
-    if (polyline.is_empty()) {
+    if polyline.is_empty() {
         return ClipSegments::default();
     }
     let mut bins = Vec::new();
@@ -670,11 +670,11 @@ pub fn vein_shape(poly: &Polyline, n_opt: Option<i64>) -> Vec<Polyline> {
     let n = n_opt.unwrap_or(50);
     let bbox = get_boundingbox(poly);
     let mut out = vec![];
-    for i in 0..n {
+    for _ in 0..n {
         let mut x = bbox.x + rand() * bbox.w;
         let mut y = bbox.y + rand() * bbox.h;
         let mut o = vec![(x, y)];
-        for j in 0..15 {
+        for _ in 0..15 {
             let dx = (noise(x * 0.1, Some(y * 0.1), Some(7.)) - 0.5) * 4.;
             let dy = (noise(x * 0.1, Some(y * 0.1), Some(6.)) - 0.5) * 4.;
             x += dx;
@@ -733,16 +733,16 @@ pub fn isect_circ_line((cx, cy): Point, r: f64, (x0, y0): Point, (x1, y1): Point
     let b = 2. * (fx * dx + fy * dy);
     let c = (fx * fx + fy * fy) - r * r;
     let mut discriminant = b * b - 4. * a * c;
-    if (discriminant < 0.) {
+    if discriminant < 0. {
         return None;
     }
     discriminant = discriminant.sqrt();
     let t0 = (-b - discriminant) / (2. * a);
-    if (0. <= t0 && t0 <= 1.) {
+    if 0. <= t0 && t0 <= 1. {
         return Some(t0);
     }
     let t = (-b + discriminant) / (2. * a);
-    if (t > 1. || t < 0.) {
+    if t > 1. || t < 0. {
         return None;
     }
     return Some(t);
@@ -785,7 +785,7 @@ pub fn resample(polyline_slice: &[Point], step: f64) -> Vec<Point> {
         for j in i + 2..polyline.len() {
             let b = polyline[j - 1];
             let c = polyline[j];
-            if (b.0 == c.0 && b.1 == c.1) {
+            if b.0 == c.0 && b.1 == c.1 {
                 continue;
             }
             let t_opt: Option<f64> = isect_circ_line((rpx, rpy), step, b, c);
@@ -808,13 +808,13 @@ pub fn resample(polyline_slice: &[Point], step: f64) -> Vec<Point> {
         i = nxt;
     }
 
-    if (out.len() > 1) {
+    if out.len() > 1 {
         let lx = out[out.len() - 1].0;
         let ly = out[out.len() - 1].1;
         let mx = polyline[polyline.len() - 1].0;
         let my = polyline[polyline.len() - 1].1;
         let d = f64::sqrt((mx - lx).powi(2) + (my - ly).powi(2));
-        if (d < step * 0.5) {
+        if d < step * 0.5 {
             out.pop();
         }
     }
@@ -831,15 +831,15 @@ pub fn pt_seg_dist((x, y): Point, (x1, y1): Point, (x2, y2): Point) -> f64 {
     let dot = a * c + b * d;
     let len_sq = c * c + d * d;
     let mut param = -1.;
-    if (len_sq != 0.) {
+    if len_sq != 0. {
         param = dot / len_sq;
     }
     let xx;
     let yy;
-    if (param < 0.) {
+    if param < 0. {
         xx = x1;
         yy = y1;
-    } else if (param > 1.) {
+    } else if param > 1. {
         xx = x2;
         yy = y2;
     } else {
