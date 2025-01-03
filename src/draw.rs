@@ -1658,23 +1658,21 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
             );
         }
     }
-    let cf;
-    let fh: Vec<Polyline>;
-    if arg.neck_type == 0 {
-        (cf, fh) = fish_head(
+    let (cf, fh) = if arg.neck_type == 0 {
+        fish_head(
             (50. - arg.head_length, 150. + arg.nose_height),
             curve0[6],
             curve1[5],
             arg,
-        );
+        )
     } else {
-        (cf, fh) = fish_head(
+        fish_head(
             (50. - arg.head_length, 150. + arg.nose_height),
             curve0[5],
             curve1[6],
             arg,
-        );
-    }
+        )
+    };
     bd = clip_multi(&bd, &cf).dont_clip;
 
     sh = clip_multi(&sh, &cf).dont_clip;
@@ -1713,7 +1711,6 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
     bd.extend(sh);
     bd.extend(sh2);
     bd.extend(sh3);
-    // bd.extend([cf]);
     bd
 }
 
