@@ -1,3 +1,4 @@
+#![allow(dead_code, unused)]
 use clap::ValueEnum;
 use custom_rand::{seed_rand, str_to_seed};
 use draw::{cleanup, draw_svg, fish, reframe};

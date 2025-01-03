@@ -1,3 +1,4 @@
+#![allow(dead_code, unused)]
 use clap::{command, Parser};
 use core::f64;
 use fish_oxide::{generate, Format};
