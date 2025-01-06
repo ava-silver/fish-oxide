@@ -49,7 +49,7 @@ pub fn generate(
             .iter()
             .map(|x| {
                 x.iter()
-                    .map(|z| format!("{:?}", *z))
+                    .map(|z| format!("{:?},{:?}", (*z).0, (*z).1))
                     .collect::<Vec<String>>()
                     .join(",")
             })
