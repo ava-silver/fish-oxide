@@ -550,7 +550,7 @@ pub fn clip_multi(polylines: &Vec<Polyline>, polygon: &Polyline) -> ClipSegments
     return out;
 }
 
-pub fn binclip(polyline: &Polyline, func: fn(Point, usize) -> bool) -> ClipSegments {
+pub fn binclip(polyline: &Polyline, func: impl Fn(Point, usize) -> bool) -> ClipSegments {
     if polyline.is_empty() {
         return ClipSegments::default();
     }

@@ -7,8 +7,8 @@ use std::{
 use crate::{
     custom_rand::{deviate, noise, rand},
     geometry::{
-        binclip_multi, clip, clip_multi, dist, fill_shape, flat, get_boundingbox, lerp, lerp2d,
-        poly_union, pow, pt_seg_dist, resample, scl_poly, shade_shape, shr_poly, trsl_poly,
+        binclip, binclip_multi, clip, clip_multi, dist, fill_shape, flat, get_boundingbox, lerp,
+        lerp2d, poly_union, pow, pt_seg_dist, resample, scl_poly, shade_shape, shr_poly, trsl_poly,
         vein_shape, Point, Polyline, PolylineOps,
     },
     hershey::compile_hershey,
@@ -470,54 +470,54 @@ pub fn fish_body_c(curve0: &Polyline, curve1: &Polyline, scale_scale: f64) -> Ve
         .chain(o0.into_iter())
         .collect()
 }
-/*
 
-pub fn fish_body_d(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_func: Option<impl Fn(Point) -> f64>) -> Vec<Polyline>{
-  let curve2 = [];
-  for i in 0..curve0.len() {
-    curve2.push(lerp2d(...curve0[i],...curve1[i],0.4));
-  }
-  curve0 = resample(curve0,10*scale_scale);
-  curve1 = resample(curve1,10*scale_scale);
-  curve2 = resample(curve2,10*scale_scale);
+pub fn fish_body_d(curve0: &Polyline, curve1: &Polyline, scale_scale: f64) -> Vec<Polyline> {
+    let mut curve2 = vec![];
+    for i in 0..curve0.len() {
+        curve2.push(lerp2d(curve0[i], curve1[i], 0.4));
+    }
+    let curve0 = resample(curve0, 10. * scale_scale);
+    let curve1 = resample(curve1, 10. * scale_scale);
+    curve2 = resample(&curve2, 10. * scale_scale);
 
-  let outline1 = curve0.concat(curve1.slice().reverse());
-  let outline2 = curve0.concat(curve2.slice().reverse());
+    let outline1 = curve0.concat(&curve1.rev());
+    let outline2 = curve0.concat(&curve2.rev());
 
-  let o0 = [curve2];
-  for i in 3; i < Math.min(curve0.len(),curve1.len(),curve2.len()) {
-    let a = [curve0[i],curve2[i-3]];
-    let b = [curve2[i-3],curve1[i]];
-
-    o0.push(a,b);
-  }
-
-  let o1 = [];
-  for i in 0..o0.len() {
-    o0[i] = resample(o0[i],4);
-    for j in 0..o0[i].len(); j++){
-      let [x,y] = o0[i][j];
-      let dx = 30*(noise(x*0.01,y*0.01,-1)-0.5);
-      let dy = 30*(noise(x*0.01,y*0.01,9)-0.5);
-      o0[i][j].0 += dx;
-      o0[i][j].1 += dy;
+    let mut o0 = vec![curve2.clone()];
+    for i in 3..curve0.len().min(curve1.len()).min(curve2.len()) {
+        o0.push(vec![curve0[i], curve2[i - 3]]);
+        o0.push(vec![curve2[i - 3], curve1[i]]);
     }
 
-    o1.push(...binclip(o0[i],(x,y,t)=>(
-      (rand()>Math.cos(t*PI) && rand() < x/500) || (rand()>Math.cos(t*PI) && rand() < x/500)
-    )).clip);
-  }
-  o1 = clip_multi(o1,outline1).clip;
+    let mut o1 = vec![];
+    for i in 0..o0.len() {
+        o0[i] = resample(&o0[i], 4.);
+        for j in 0..o0[i].len() {
+            let (x, y) = o0[i][j];
+            let dx = 30. * (noise(x * 0.01, Some(y * 0.01), Some(-1.)) - 0.5);
+            let dy = 30. * (noise(x * 0.01, Some(y * 0.01), Some(9.)) - 0.5);
+            o0[i][j].0 += dx;
+            o0[i][j].1 += dy;
+        }
 
-  let sh = vein_shape(outline1);
+        o1.extend(
+            binclip(&o0[i], |(x, y), t| {
+                ((rand() > (t as f64 * PI).cos() && rand() < x / 500.)
+                    || (rand() > (t as f64 * PI).cos() && rand() < x / 500.))
+            })
+            .clip,
+        );
+    }
+    o1 = clip_multi(&o1, &outline1).clip;
 
-  let o = [];
-  o.push(curve0,curve1.slice().reverse(),...o1,...sh);
-  return o;
+    let sh = vein_shape(&outline1, None);
+
+    [curve0, curve1.rev()]
+        .into_iter()
+        .chain(o1)
+        .chain(sh)
+        .collect()
 }
-
-
-*/
 
 pub fn fin_a(
     curve: &Polyline,
@@ -1342,7 +1342,7 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
         0 => fish_body_a(&curve0, &curve1, arg.scale_scale, pattern_func.clone()),
         1 => fish_body_b(&curve0, &curve1, arg.scale_scale, pattern_func.clone()),
         2 => fish_body_c(&curve0, &curve1, arg.scale_scale),
-        3 => todo!("fish_body_d(curve0, curve1, arg.scale_scale)"),
+        3 => fish_body_d(&curve0, &curve1, arg.scale_scale),
         _ => unreachable!(),
     };
     // assert_not_nans(&bd);

@@ -114,8 +114,8 @@ pub fn generate_params() -> Params {
     arg.body_curve_amount = rndtri_f(0.5, 0.85, 0.98);
     arg.body_length = rndtri_f(200., 350., 420.);
     arg.body_height = rndtri_f(45., 90., 150.);
-    // arg.scale_type = *choice(&[0, 1, 2, 3], None); TODO: fix this
-    arg.scale_type = 0;
+    arg.scale_type = *choice(&[0, 1, 2, 3], None);
+    arg.scale_type = 3;
     arg.scale_scale = rndtri_f(0.8, 1., 1.5);
     // arg.pattern_type = *choice(&[0, 1, 2, 3, 4], None); TODO: fix this
     arg.pattern_type = 0;
