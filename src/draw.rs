@@ -1,14 +1,15 @@
 use std::{
     f64::consts::{E, PI},
+    iter::successors,
     rc::Rc,
 };
 
 use crate::{
     custom_rand::{deviate, noise, rand},
     geometry::{
-        binclip_multi, clip, clip_multi, dist, fill_shape, get_boundingbox, lerp, lerp2d,
+        binclip_multi, clip, clip_multi, dist, fill_shape, flat, get_boundingbox, lerp, lerp2d,
         poly_union, pow, pt_seg_dist, resample, scl_poly, shade_shape, shr_poly, trsl_poly,
-        vein_shape, Point, Polyline,
+        vein_shape, Point, Polyline, PolylineOps,
     },
     hershey::compile_hershey,
     params::Params,
@@ -312,23 +313,11 @@ fn fish_body_a(
     assert_not_nan(&curve2);
     assert_not_nan(&curve3);
 
-    let outline1: Polyline = curve0
-        .clone()
-        .into_iter()
-        .chain(curve1.clone().into_iter().rev())
-        .collect();
-    let outline2 = curve0
-        .clone()
-        .into_iter()
-        .chain(curve2.clone().into_iter().rev())
-        .collect();
-    let outline3 = curve0
-        .clone()
-        .into_iter()
-        .chain(curve3.clone().into_iter().rev())
-        .collect();
+    let outline1 = curve0.concat(&curve1.rev());
+    let outline2 = curve0.concat(&curve2.rev());
+    let outline3 = curve0.concat(&curve3.rev());
 
-    let bbox = get_boundingbox(&curve0.clone().into_iter().chain(curve1.clone()).collect());
+    let bbox = get_boundingbox(&curve0.concat(curve1));
     let m = (bbox.w / (scale_scale * 15.)).trunc() as usize;
     let n = (bbox.h / (scale_scale * 15.)).trunc() as usize;
     let uw = bbox.w / m as f64;
@@ -350,131 +339,138 @@ fn fish_body_a(
     let o0 = clip_multi(&sq, &outline2).clip;
     let mut o1 = clip_multi(&o0, &outline3);
     o1.dont_clip = o1.dont_clip.into_iter().filter(|x| rand() < 0.6).collect();
-    let mut curve1_rev = curve1.clone();
 
-    curve1_rev.reverse();
-    return vec![curve0.clone(), curve1_rev]
+    [curve0.clone(), curve1.rev()]
         .into_iter()
         .chain(o1.clip)
         .chain(o1.dont_clip)
-        .collect();
+        .collect()
 }
-/*
-pub fn fish_body_b(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_func: Option<impl Fn(Point) -> f64>) -> Vec<Polyline>{
-  let mut curve2 = vec![];
-  for i in 0..curve0.len() {
-    curve2.push(lerp2d(curve0[i],curve1[i],0.95));
-  }
-  let outline1 = curve0.concat(curve1.slice().reverse());
-  let outline2 = curve0.concat(curve2.slice().reverse());
 
-  let bbox = get_boundingbox(curve0.concat(curve1));
-  let m = !!(bbox.w/(scale_scale*5));
-  let n = !!(bbox.h/(scale_scale*5));
-  let uw = bbox.w/m;
-  let uh = bbox.h/n;
-
-  let sq = squama_mesh(m,n+16,uw,uh,|(x,y),(w,h)|squama(w*0.7,h*0.6,0),uw*8,uh*8,false).map(|a|trsl_poly(a,bbox.x,bbox.y-uh*8));
-  let o0 = clip_multi(sq,outline2)[true];
-
-  let o1 = [];
-  for i in 0..o0.len() {
-    let [x,y] = o0[i].0;
-    let t = (y-bbox.y)/bbox.h;
-    // if (rand() > t){
-    //   o1.push(o0[i]);
-    // }
-    // if ((!!(x/30))%2 || (rand() > t && rand()>t)){
-    //   o1.push(o0[i]);
-    // }
-    if (pattern_func){
-      if (pattern_func(x,y) || (rand() > t && rand()>t)) {
-        o1.push(o0[i]);
-      }
-    }else{
-      if (rand() > t){
-        o1.push(o0[i]);
-      }
+pub fn fish_body_b(
+    curve0: &Polyline,
+    curve1: &Polyline,
+    scale_scale: f64,
+    pattern_func: Option<Rc<dyn Fn((f64, f64)) -> bool>>,
+) -> Vec<Polyline> {
+    let mut curve2 = vec![];
+    for i in 0..curve0.len() {
+        curve2.push(lerp2d(curve0[i], curve1[i], 0.95));
     }
-  }
-  let mut curve1_rev = curve1.clone();
+    let outline1 = curve0.concat(&curve1.rev());
+    let outline2 = curve0.concat(&curve2.rev());
 
-    curve1_rev.reverse();
-  return vec![curve0.clone(), curve1_rev].into_iter().chain(o1).collect();
+    let bbox = get_boundingbox(&curve0.concat(curve1));
+    let m = (bbox.w / (scale_scale * 5.)).trunc();
+    let n = (bbox.h / (scale_scale * 5.)).trunc();
+    let uw = bbox.w / m;
+    let uh = bbox.h / n;
+
+    let sq = squama_mesh(
+        m as usize,
+        n as usize + 16,
+        (uw, uh),
+        Box::new(|(x, y), (w, h)| squama(w * 0.7, h * 0.6, Some(0))),
+        (uw * 8., uh * 8.),
+        Some(false),
+    )
+    .iter()
+    .map(|a| trsl_poly(a, bbox.x, bbox.y - uh * 8.))
+    .collect();
+    let o0 = clip_multi(&sq, &outline2).clip;
+
+    let mut o1 = vec![];
+    for line in o0 {
+        let (x, y) = line[0];
+        let t = (y - bbox.y) / bbox.h;
+        // if (rand() > t){
+        //   o1.push(line);
+        // }
+        // if ((!!(x/30))%2 || (rand() > t && rand()>t)){
+        //   o1.push(line);
+        // }
+        if let Some(funky) = &pattern_func {
+            if (funky((x, y)) || (rand() > t && rand() > t)) {
+                o1.push(line);
+            }
+        } else {
+            if (rand() > t) {
+                o1.push(line);
+            }
+        }
+    }
+
+    [curve0.clone(), curve1.rev()]
+        .into_iter()
+        .chain(o1)
+        .collect()
 }
 
+pub fn fish_body_c(curve0: &Polyline, curve1: &Polyline, scale_scale: f64) -> Vec<Polyline> {
+    let step = 6. * scale_scale;
 
-pub fn ogee(x: f64) -> f64{
-  return 4. * pow(x-0.5,3) + 0.5;
-}
+    let mut curve2 = vec![];
+    let mut curve3 = vec![];
 
-pub fn fish_body_c(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_func: Option<impl Fn(Point) -> f64>) -> Vec<Polyline>{
-  let step = 6*scale_scale;
+    for i in 0..curve0.len() {
+        curve2.push(lerp2d(curve0[i], curve1[i], 0.95));
+        curve3.push(lerp2d(curve0[i], curve1[i], 0.4));
+    }
+    let outline1 = curve0.concat(&curve1.rev());
+    let outline2 = curve0.concat(&curve2.rev());
 
-  let curve2 = [];
-  let curve3 = [];
+    let mut bbox = get_boundingbox(&curve0.concat(&curve1));
+    bbox.x -= step;
+    bbox.y -= step;
+    bbox.w += step * 2.;
+    bbox.h += step * 2.;
 
-  for i in 0..curve0.len() {
-    curve2.push(lerp2d(curve0[i],curve1[i],0.95));
-    curve3.push(lerp2d(curve0[i],curve1[i],0.4));
-  }
-  let outline1 = curve0.concat(curve1.slice().reverse());
-  let outline2 = curve0.concat(curve2.slice().reverse());
+    let mut lines = vec![curve3.rev()];
 
-  let bbox = get_boundingbox(curve0.concat(curve1));
-  bbox.x -= step;
-  bbox.y -= step;
-  bbox.w += step*2;
-  bbox.h += step*2;
-
-  let lines = [curve3.reverse()];
-
-  for i in successors(Some(-bbox.h), |i| {
+    for i in successors(Some(-bbox.h), |i| {
         let next = i + step;
         (next < bbox.w).then_some(next)
-    }){
-    let x0 = bbox.x + i;
-    let y0 = bbox.y;
-    let x1 = bbox.x + i + bbox.h;
-    let y1 = bbox.y + bbox.h;
-    lines.push([[x0,y0],[x1,y1]]);
-  }
-
-  for i in   successors(Some(0.), |i| {
-        let next = i + step;
-        (next < bbox.w+bbox.h).then_some(next)
-    }){
-    let x0 = bbox.x + i;
-    let y0 = bbox.y;
-    let x1 = bbox.x + i - bbox.h;
-    let y1 = bbox.y + bbox.h;
-    lines.push([[x0,y0],[x1,y1]]);
-  }
-  for i in 0..lines.len() {
-    lines[i] = resample(lines[i],4);
-    for j in 0..lines[i].len(){
-      let [x,y] = lines[i][j];
-      let t = (y-bbox.y)/bbox.h;
-      let y1 = -Math.cos(t*PI)*bbox.h/2+bbox.y+bbox.h/2;
-
-      let dx = (noise(x*0.005,y1*0.005,0.1)-0.5)*50;
-      let dy = (noise(x*0.005,y1*0.005,1.2)-0.5)*50;
-
-      lines[i][j].0 += dx;
-      lines[i][j].1 = y1 + dy;
+    }) {
+        lines.push(vec![
+            (bbox.x + i, bbox.y),
+            (bbox.x + i + bbox.h, bbox.y + bbox.h),
+        ]);
     }
-  }
 
-  let o0 = clip_multi(lines,outline2)[true];
+    for i in successors(Some(0.), |i| {
+        let next = i + step;
+        (next < bbox.w + bbox.h).then_some(next)
+    }) {
+        lines.push(vec![
+            (bbox.x + i, bbox.y),
+            (bbox.x + i - bbox.h, bbox.y + bbox.h),
+        ]);
+    }
+    for i in 0..lines.len() {
+        lines[i] = resample(&lines[i], 4.);
+        for j in 0..lines[i].len() {
+            let (x, y) = lines[i][j];
+            let t = (y - bbox.y) / bbox.h;
+            let y1 = -f64::cos(t * PI) * bbox.h / 2. + bbox.y + bbox.h / 2.;
 
-  o0 = clip_multi(o0,(x,y,t)=>(rand()>t||rand()>t),binclip).clip;
+            let dx = (noise(x * 0.005, Some(y1 * 0.005), Some(0.1)) - 0.5) * 50.;
+            let dy = (noise(x * 0.005, Some(y1 * 0.005), Some(1.2)) - 0.5) * 50.;
 
+            lines[i][j].0 += dx;
+            lines[i][j].1 = y1 + dy;
+        }
+    }
 
-  let o = [];
+    let mut o0 = clip_multi(&lines, &outline2).clip;
 
-  o.push(curve0,curve1.slice().reverse(),...o0);
-  return o;
+    o0 = binclip_multi(&o0, |(x, y), t| (rand() > t as f64 || rand() > t as f64)).clip;
+
+    [curve0.clone(), curve1.rev()]
+        .into_iter()
+        .chain(o0.into_iter())
+        .collect()
 }
+/*
 
 pub fn fish_body_d(curve0: &Polyline,curve1: &Polyline,scale_scale: f64,pattern_func: Option<impl Fn(Point) -> f64>) -> Vec<Polyline>{
   let curve2 = [];
@@ -586,8 +582,7 @@ pub fn fin_a(
         if i == 0 {
             out2 = p;
         } else if i == curve.len() - 1 {
-            out3 = p.clone();
-            out3.reverse();
+            out3 = p.rev();
         } else {
             out0.push(p[p.len() - 1]);
             // if (i % 2){
@@ -605,14 +600,9 @@ pub fn fin_a(
         out0[i].0 += (noise(x * 0.1, Some(y * 0.1), None) * 6. - 3.) * (softness / 10.);
         out0[i].1 += (noise(x * 0.1, Some(y * 0.1), None) * 6. - 3.) * (softness / 10.);
     }
-    let mut o: Polyline = out2
-        .into_iter()
-        .chain(out0.into_iter())
-        .chain(out3.into_iter())
-        .collect();
+    let mut o: Polyline = [out2, out0, out3].into_iter().flatten().collect();
     out1.insert(0, o.clone());
-    o.extend(curve.clone().into_iter().rev());
-    return (o, out1);
+    return (o.concat(&curve.rev()), out1);
 }
 
 /*
@@ -769,13 +759,7 @@ pub fn finlet(curve: &Polyline, h: f64, dir_opt: Option<i32>) -> (Polyline, Vec<
         out0[i].1 += noise(x * 0.1, Some(y * 0.1), None) * 2. - 3.;
     }
     out0.push(curve[curve.len() - 1]);
-    return (
-        out0.clone()
-            .into_iter()
-            .chain(curve.clone().into_iter().rev())
-            .collect(),
-        vec![out0],
-    );
+    return (out0.concat(&curve.rev()), vec![out0]);
 }
 
 pub fn fin_adipose(curve: &Polyline, dx: f64, dy: f64, r: f64) -> (Polyline, Vec<Polyline>) {
@@ -810,11 +794,7 @@ pub fn fin_adipose(curve: &Polyline, dx: f64, dy: f64, r: f64) -> (Polyline, Vec
         out0[i].0 += (noise(x * 0.01, Some(y * 0.01), None) - 0.5) * s * 50.;
         out0[i].1 += (noise(x * 0.01, Some(y * 0.01), None) - 0.5) * s * 50.;
     }
-    let cc = out0
-        .clone()
-        .into_iter()
-        .chain(curve.clone().into_iter().rev())
-        .collect();
+    let cc = out0.concat(&curve.rev());
     let mut out1 = clip(&trsl_poly(&out0, 0., 4.), &cc).clip;
     fn shape((x, y): Point, t: usize) -> bool {
         rand() < (t as f64 * PI).sin()
@@ -907,7 +887,7 @@ pub fn fish_jaw((x0, y0): Point, (x1, y1): Point, (x2, y2): Point) -> (Polyline,
     }
     return (
         vec![(x2, y2), (x1, y1), (x0, y0)],
-        vec![o.clone()]
+        [o.clone()]
             .into_iter()
             .chain(vein_shape(&o, Some(5)))
             .collect(),
@@ -1333,8 +1313,7 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
             curve1.push((x, y));
         }
     }
-    let mut outline = curve0.clone();
-    outline.extend(curve1.clone().into_iter().rev());
+    let mut outline = curve0.concat(&curve1.rev());
     let mut sh = shade_shape(&outline, Some(8.), Some(-12.), Some(-12.));
     assert_not_nans(&sh);
 
@@ -1359,18 +1338,13 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
         //small dot;
     }
 
-    let mut bd;
-    if arg.scale_type == 0 {
-        bd = fish_body_a(&curve0, &curve1, arg.scale_scale, pattern_func.clone());
-    } else if arg.scale_type == 1 {
-        bd = todo!("fish_body_b(curve0, curve1, arg.scale_scale, pattern_func)");
-    } else if arg.scale_type == 2 {
-        bd = todo!("fish_body_c(curve0, curve1, arg.scale_scale)");
-    } else if arg.scale_type == 3 {
-        bd = todo!("fish_body_d(curve0, curve1, arg.scale_scale)");
-    } else {
-        unreachable!();
-    }
+    let mut bd = match arg.scale_type {
+        0 => fish_body_a(&curve0, &curve1, arg.scale_scale, pattern_func.clone()),
+        1 => fish_body_b(&curve0, &curve1, arg.scale_scale, pattern_func.clone()),
+        2 => fish_body_c(&curve0, &curve1, arg.scale_scale),
+        3 => todo!("fish_body_d(curve0, curve1, arg.scale_scale)"),
+        _ => unreachable!(),
+    };
     // assert_not_nans(&bd);
 
     let f0_func: Box<dyn Fn(f64) -> f64>;
@@ -1757,7 +1731,7 @@ pub fn reframe(
 
     let w = 500. - pad * 2.;
     let h = (300. - pad * 2.) - (if text.is_some() { 10. } else { 0. });
-    let bbox = get_boundingbox(&polylines.clone().into_iter().flatten().collect());
+    let bbox = get_boundingbox(&flat(&polylines));
     let sw = w / bbox.w;
     let sh = h as f64 / bbox.h;
     let s = sw.min(sh);

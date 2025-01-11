@@ -8,6 +8,31 @@ use std::{
 pub type Point = (f64, f64);
 pub type Polyline = Vec<Point>;
 
+pub trait PolylineOps {
+    fn rev(&self) -> Polyline;
+    fn concat(&self, other: &Polyline) -> Polyline;
+}
+
+impl PolylineOps for Polyline {
+    fn rev(&self) -> Polyline {
+        self.iter().rev().map(|p| *p).collect()
+    }
+
+    fn concat(&self, other: &Polyline) -> Polyline {
+        let mut out = self.clone();
+        out.extend(other.iter());
+        out
+    }
+}
+
+pub fn flat(polylines: &Vec<Polyline>) -> Polyline {
+    polylines
+        .iter()
+        .flat_map(|p| p.iter())
+        .map(|p| *p)
+        .collect()
+}
+
 pub fn dist((x0, y0): Point, (x1, y1): Point) -> f64 {
     ((x1 - x0).powi(2) + (y1 - y0).powi(2)).sqrt()
 }
