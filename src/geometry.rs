@@ -3,6 +3,7 @@ use std::{
     collections::HashMap,
     f64::consts::{E, PI},
     iter::successors,
+    rc::Rc,
 };
 
 pub type Point = (f64, f64);
@@ -904,71 +905,72 @@ pub fn approx_poly_dp(polyline, epsilon){
   }
   return ret;
 }
-
-pub fn distsq(x0, y0, x1, y1) {
-  let dx = x0-x1;
-  let dy = y0-y1;
-  return dx*dx+dy*dy;
-}
-pub fn poissondisk(W, H, r, samples) {
-  let grid = [];
-  let active = [];
-  let w =  ((r) / (1.4142135624));
-  let r2 = ((r) * (r));
-  let cols = (!!(((W) / (w))));
-  let rows = (!!(((H) / (w))));
-  for i in (0); Number((i) < (((cols) * (rows)))); i += (1)) {
-    (grid).splice((grid.len()), 0, (-1));
-  };
-  let pos = [(((W) / (2.0))), (((H) / (2.0)))];
-  (samples).splice((samples.len()), 0, (pos));
-  for i in (0); Number((i) < (samples.len())); i += (1)) {
-    let col = (!!(((((((samples)[i]))[0])) / (w))));
-    let row = (!!(((((((samples)[i]))[1])) / (w))));
-    ((grid)[((col) + (((row) * (cols))))] = i);
-    (active).splice((active.len()), 0, (((samples)[i])));
-  };
-  while (active.len()) {
-    let ridx = (!!(((rand()) * (active.len()))));
-    pos = ((active)[ridx]);
-    let found = 0;
-    for n in (0); Number((n) < (30)); n += (1)) {
-      let sr = ((r) + (((rand()) * (r))));
-      let sa = ((6.2831853072) * (rand()));
-      let sx = ((((pos)[0])) + (((sr) * (Math.cos(sa)))));
-      let sy = ((((pos)[1])) + (((sr) * (Math.sin(sa)))));
-      let col = (!!(((sx) / (w))));
-      let row = (!!(((sy) / (w))));
-      if (((((((((Number((col) > (0))) && (Number((row) > (0))))) && (Number((col) < (((cols) - (1))))))) && (Number((row) < (((rows) - (1))))))) && (Number((((grid)[((col) + (((row) * (cols))))])) == (-1))))) {
-        let ok = 1;
-        for i in (-1); Number((i) <= (1)); i += (1)) {
-          for j in (-1); Number((j) <= (1)); j += (1)) {
-            let idx = ((((((((row) + (i))) * (cols))) + (col))) + (j));
-            let nbr = ((grid)[idx]);
-            if (Number((-1) != (nbr))) {
-              let d = distsq(sx, sy, ((((samples)[nbr]))[0]), ((((samples)[nbr]))[1]));
-              if (Number((d) < (r2))) {
-                ok = 0;
-              };
-            };
-          };
-        };
-        if (ok) {
-          found = 1;
-          ((grid)[((((row) * (cols))) + (col))] = samples.len());
-          let sample = [(sx), (sy)];
-          (active).splice((active.len()), 0, (sample));
-          (samples).splice((samples.len()), 0, (sample));
-        };
-      };
-    };
-    if (Number(!(found))) {
-      (active).splice((ridx), (1));
-    };
-  };
-}
-
 */
+
+pub fn distsq((x0, y0): Point, (x1, y1): Point) -> f64 {
+    let dx = x0 - x1;
+    let dy = y0 - y1;
+    dx * dx + dy * dy
+}
+
+pub fn poissondisk(width: f64, height: f64, radius: f64, samples: &mut Polyline) {
+    let mut active = vec![];
+    let radius_over_root_2 = ((radius) / (2.0f64.sqrt()));
+    let r2 = (radius.powi(2));
+    let cols = ((width) / (radius_over_root_2)) as usize;
+    let rows = ((height) / (radius_over_root_2)) as usize;
+    let mut grid: Vec<i32> = vec![-1; (cols) * (rows)];
+    let mut pos = (((width) / (2.0)), ((height) / (2.0)));
+    (samples).push((pos));
+    for i in (0..(samples.len())) {
+        let col = ((((samples)[i]).0) / (radius_over_root_2)) as usize;
+        let row = ((((samples)[i]).1) / (radius_over_root_2)) as usize;
+        ((grid)[((col) + ((row) * (cols)))] = i as i32);
+        (active).push(((samples)[i]));
+    }
+    while (!active.is_empty()) {
+        let ridx = (((rand()) * (active.len() as f64)) as usize);
+        pos = ((active)[ridx]);
+        let mut found = false;
+        for n in (0)..(30) {
+            let sr = ((radius) + ((rand()) * (radius)));
+            let sa = ((6.2831853072) * (rand()));
+            let sx = (((pos).0) + ((sr) * (f64::cos(sa))));
+            let sy = (((pos).1) + ((sr) * (f64::sin(sa))));
+            let col = (((sx) / (radius_over_root_2)) as i32);
+            let row = (((sy) / (radius_over_root_2)) as i32);
+            if ((((((col) > (0)) && ((row) > (0))) && (col < ((cols as i32) - (1))))
+                && ((row) < ((rows as i32) - (1))))
+                && (((grid)[((col) + ((row) * (cols as i32))) as usize]) == (-1)))
+            {
+                let mut ok = true;
+                for i in (-1..=(1)) {
+                    for j in (-1..=1) {
+                        let idx = (((((row) + (i)) * (cols as i32)) + (col)) + (j));
+                        let nbr = ((grid)[idx as usize]);
+                        if ((-1) != (nbr)) {
+                            let d = distsq((sx, sy), ((samples)[nbr as usize]));
+                            if ((d) < (r2)) {
+                                ok = false;
+                            };
+                        };
+                    }
+                }
+                if (ok) {
+                    found = true;
+                    ((grid)[(((row) * (cols as i32)) + (col)) as usize] = samples.len() as i32);
+                    let sample = ((sx), (sy));
+                    (active).push((sample));
+                    (samples).push((sample));
+                };
+            };
+        }
+        if (!(found)) {
+            (active).remove((ridx));
+        };
+    }
+}
+
 pub fn pow(a: f64, b: f64) -> f64 {
     return a.abs().powf(b).copysign(a);
 }
@@ -993,32 +995,26 @@ pub fn rot_poly(poly: &Polyline, th: f64) -> Polyline {
         .map(|(x0, y0)| (x0 * costh - y0 * sinth, x0 * sinth + y0 * costh))
         .collect()
 }
-/*
 
-
-pub fn pattern_dot(scale=1){
-  let samples = [];
-  poissondisk(500,300,20*scale,samples);
-  let rs = [];
-  for i in 0..samples.len() {
-    rs.push((rand()*5+10)*scale)
-  }
-  return fn(x,y){
+pub fn pattern_dot(scale: f64) -> Rc<dyn Fn((f64, f64)) -> bool> {
+    let mut samples = vec![];
+    poissondisk(500., 300., 20. * scale, &mut samples);
+    let mut rs = vec![];
     for i in 0..samples.len() {
-      let r = rs[i];
-      if (dist(x,y,...samples[i])<r){
-
-        let [x0,y0] = samples[i];
-        let dx = x - x0;
-        let dy = y - y0;
-        if (gauss2d(dx/r*2,dy/r*2)*noise(x,y,999) > 0.2){
-          return true;
-        }
-      }
+        rs.push((rand() * 5. + 10.) * scale)
     }
-    return false;
-  }
+    Rc::new(move |(x, y)| {
+        for i in 0..samples.len() {
+            let r = rs[i];
+            if (dist((x, y), samples[i]) < r) {
+                let (x0, y0) = samples[i];
+                let dx = x - x0;
+                let dy = y - y0;
+                if (gauss2d(dx / r * 2., dy / r * 2.) * noise(x, Some(y), Some(999.)) > 0.2) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    })
 }
-
-
-*/

@@ -8,8 +8,8 @@ use crate::{
     custom_rand::{deviate, noise, rand},
     geometry::{
         binclip, binclip_multi, clip, clip_multi, dist, fill_shape, flat, get_boundingbox, lerp,
-        lerp2d, poly_union, pow, pt_seg_dist, resample, scl_poly, shade_shape, shr_poly, trsl_poly,
-        vein_shape, Point, Polyline, PolylineOps,
+        lerp2d, pattern_dot, poly_union, pow, pt_seg_dist, resample, scl_poly, shade_shape,
+        shr_poly, trsl_poly, vein_shape, Point, Polyline, PolylineOps,
     },
     hershey::compile_hershey,
     params::Params,
@@ -1317,26 +1317,24 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
     let mut sh = shade_shape(&outline, Some(8.), Some(-12.), Some(-12.));
     assert_not_nans(&sh);
 
-    let mut pattern_func: Option<Rc<dyn Fn((f64, f64)) -> bool>> = None;
-    if arg.pattern_type == 0 {
-        //none
-    } else if arg.pattern_type == 1 {
-        // pattern_func = (x,y)=>{
-        //   return noise(x*0.1,y*0.1)>0.55;
-        // };
-        pattern_func = Some(todo!("pattern_dot(arg.pattern_scale)"));
-    } else if arg.pattern_type == 2 {
-        pattern_func = Some(Rc::new(|(x, y)| {
+    let mut pattern_func: Option<Rc<dyn Fn((f64, f64)) -> bool>> = match arg.pattern_type {
+        0 => None, // none
+        1 => {
+            // (x,y)=>{
+            //   return noise(x*0.1,y*0.1)>0.55;
+            // }
+            Some(pattern_dot(arg.pattern_scale))
+        }
+        2 => Some(Rc::new(|(x, y)| {
             (noise(x * 0.1, Some(y * 0.1), None) * f64::max(0.35, (y - 10.) / 280.)) < 0.2
-        }));
-    } else if arg.pattern_type == 3 {
-        pattern_func = Some(Rc::new(move |(x, y)| {
+        })),
+        3 => Some(Rc::new(move |(x, y)| {
             let dx = noise(x * 0.01, Some(y * 0.01), None) * 30.;
             ((x + dx) / (30. * arg.pattern_scale)).trunc() as i64 % 2 == 1
-        }));
-    } else if arg.pattern_type == 4 {
-        //small dot;
-    }
+        })),
+        4 => None, //small dot;
+        _ => panic!("invalid pattern type: {}", arg.pattern_type),
+    };
 
     let mut bd = match arg.scale_type {
         0 => fish_body_a(&curve0, &curve1, arg.scale_scale, pattern_func.clone()),
