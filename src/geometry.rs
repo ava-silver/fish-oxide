@@ -915,58 +915,60 @@ pub fn distsq((x0, y0): Point, (x1, y1): Point) -> f64 {
 
 pub fn poissondisk(width: f64, height: f64, radius: f64, samples: &mut Polyline) {
     let mut active = vec![];
-    let radius_over_root_2 = ((radius) / (2.0f64.sqrt()));
-    let r2 = (radius.powi(2));
-    let cols = ((width) / (radius_over_root_2)) as usize;
-    let rows = ((height) / (radius_over_root_2)) as usize;
+    let radius_over_root_2 = radius / 2.0f64.sqrt();
+    let r2 = radius.powi(2);
+    let cols = (width / radius_over_root_2) as usize;
+    let rows = (height / radius_over_root_2) as usize;
     let mut grid: Vec<i32> = vec![-1; (cols) * (rows)];
-    let mut pos = (((width) / (2.0)), ((height) / (2.0)));
-    (samples).push((pos));
-    for i in (0..(samples.len())) {
-        let col = ((((samples)[i]).0) / (radius_over_root_2)) as usize;
-        let row = ((((samples)[i]).1) / (radius_over_root_2)) as usize;
-        ((grid)[((col) + ((row) * (cols)))] = i as i32);
-        (active).push(((samples)[i]));
+    let mut pos = (width / 2., height / 2.);
+    samples.push(pos);
+    for i in 0..samples.len() {
+        let col = (samples[i].0 / radius_over_root_2) as usize;
+        let row = (samples[i].1 / radius_over_root_2) as usize;
+        grid[col + (row * cols)] = i as i32;
+        active.push(samples[i]);
     }
-    while (!active.is_empty()) {
-        let ridx = (((rand()) * (active.len() as f64)) as usize);
-        pos = ((active)[ridx]);
+    while !active.is_empty() {
+        let ridx = (rand() * active.len() as f64) as usize;
+        pos = active[ridx];
         let mut found = false;
-        for n in (0)..(30) {
-            let sr = ((radius) + ((rand()) * (radius)));
-            let sa = ((6.2831853072) * (rand()));
-            let sx = (((pos).0) + ((sr) * (f64::cos(sa))));
-            let sy = (((pos).1) + ((sr) * (f64::sin(sa))));
-            let col = (((sx) / (radius_over_root_2)) as i32);
-            let row = (((sy) / (radius_over_root_2)) as i32);
-            if ((((((col) > (0)) && ((row) > (0))) && (col < ((cols as i32) - (1))))
-                && ((row) < ((rows as i32) - (1))))
-                && (((grid)[((col) + ((row) * (cols as i32))) as usize]) == (-1)))
+        for _ in 0..30 {
+            let sr = radius + (rand() * radius);
+            let sa = 6.2831853072 * rand();
+            let sx = pos.0 + (sr * sa.cos());
+            let sy = pos.1 + (sr * sa.sin());
+            let col = (sx / radius_over_root_2) as i32;
+            let row = (sy / radius_over_root_2) as i32;
+            if col > 0
+                && row > 0
+                && col < cols as i32 - 1
+                && row < rows as i32 - 1
+                && grid[(col + (row * cols as i32)) as usize] == -1
             {
                 let mut ok = true;
-                for i in (-1..=(1)) {
-                    for j in (-1..=1) {
-                        let idx = (((((row) + (i)) * (cols as i32)) + (col)) + (j));
-                        let nbr = ((grid)[idx as usize]);
-                        if ((-1) != (nbr)) {
-                            let d = distsq((sx, sy), ((samples)[nbr as usize]));
-                            if ((d) < (r2)) {
+                for i in -1..=1 {
+                    for j in -1..=1 {
+                        let idx = (((row + i) * cols as i32) + col) + j;
+                        let nbr = grid[idx as usize];
+                        if -1 != nbr {
+                            let d = distsq((sx, sy), samples[nbr as usize]);
+                            if d < r2 {
                                 ok = false;
                             };
                         };
                     }
                 }
-                if (ok) {
+                if ok {
                     found = true;
-                    ((grid)[(((row) * (cols as i32)) + (col)) as usize] = samples.len() as i32);
-                    let sample = ((sx), (sy));
-                    (active).push((sample));
-                    (samples).push((sample));
+                    grid[((row * (cols as i32)) + col) as usize] = samples.len() as i32;
+                    let sample = (sx, sy);
+                    active.push(sample);
+                    samples.push(sample);
                 };
             };
         }
-        if (!(found)) {
-            (active).remove((ridx));
+        if !found {
+            active.remove(ridx);
         };
     }
 }
@@ -1000,17 +1002,17 @@ pub fn pattern_dot(scale: f64) -> Rc<dyn Fn((f64, f64)) -> bool> {
     let mut samples = vec![];
     poissondisk(500., 300., 20. * scale, &mut samples);
     let mut rs = vec![];
-    for i in 0..samples.len() {
+    for _ in 0..samples.len() {
         rs.push((rand() * 5. + 10.) * scale)
     }
     Rc::new(move |(x, y)| {
         for i in 0..samples.len() {
             let r = rs[i];
-            if (dist((x, y), samples[i]) < r) {
+            if dist((x, y), samples[i]) < r {
                 let (x0, y0) = samples[i];
                 let dx = x - x0;
                 let dy = y - y0;
-                if (gauss2d(dx / r * 2., dy / r * 2.) * noise(x, Some(y), Some(999.)) > 0.2) {
+                if gauss2d(dx / r * 2., dy / r * 2.) * noise(x, Some(y), Some(999.)) > 0.2 {
                     return true;
                 }
             }

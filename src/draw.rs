@@ -390,11 +390,11 @@ pub fn fish_body_b(
         //   o1.push(line);
         // }
         if let Some(funky) = &pattern_func {
-            if (funky((x, y)) || (rand() > t && rand() > t)) {
+            if funky((x, y)) || (rand() > t && rand() > t) {
                 o1.push(line);
             }
         } else {
-            if (rand() > t) {
+            if rand() > t {
                 o1.push(line);
             }
         }
@@ -502,8 +502,8 @@ pub fn fish_body_d(curve0: &Polyline, curve1: &Polyline, scale_scale: f64) -> Ve
 
         o1.extend(
             binclip(&o0[i], |(x, y), t| {
-                ((rand() > (t as f64 * PI).cos() && rand() < x / 500.)
-                    || (rand() > (t as f64 * PI).cos() && rand() < x / 500.))
+                (rand() > (t as f64 * PI).cos() && rand() < x / 500.)
+                    || (rand() > (t as f64 * PI).cos() && rand() < x / 500.)
             })
             .clip,
         );
@@ -600,7 +600,7 @@ pub fn fin_a(
         out0[i].0 += (noise(x * 0.1, Some(y * 0.1), None) * 6. - 3.) * (softness / 10.);
         out0[i].1 += (noise(x * 0.1, Some(y * 0.1), None) * 6. - 3.) * (softness / 10.);
     }
-    let mut o: Polyline = [out2, out0, out3].into_iter().flatten().collect();
+    let o: Polyline = [out2, out0, out3].into_iter().flatten().collect();
     out1.insert(0, o.clone());
     return (o.concat(&curve.rev()), out1);
 }
@@ -1317,7 +1317,7 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
     let mut sh = shade_shape(&outline, Some(8.), Some(-12.), Some(-12.));
     assert_not_nans(&sh);
 
-    let mut pattern_func: Option<Rc<dyn Fn((f64, f64)) -> bool>> = match arg.pattern_type {
+    let pattern_func: Option<Rc<dyn Fn((f64, f64)) -> bool>> = match arg.pattern_type {
         0 => None, // none
         1 => {
             // (x,y)=>{
