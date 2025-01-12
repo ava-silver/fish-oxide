@@ -8,8 +8,8 @@ use crate::{
     custom_rand::{deviate, noise, rand},
     geometry::{
         binclip, binclip_multi, clip, clip_multi, dist, fill_shape, flat, get_boundingbox, lerp,
-        lerp2d, pattern_dot, poly_union, pow, pt_seg_dist, resample, scl_poly, shade_shape,
-        shr_poly, trsl_poly, vein_shape, Point, Polyline, PolylineOps,
+        lerp2d, pattern_dot, patternshade_shape, poly_union, pow, pt_seg_dist, resample, scl_poly,
+        shade_shape, shr_poly, smalldot_shape, trsl_poly, vein_shape, Point, Polyline, PolylineOps,
     },
     hershey::compile_hershey,
     params::Params,
@@ -438,7 +438,11 @@ pub fn fish_body_c(curve0: &Polyline, curve1: &Polyline, scale_scale: f64) -> Ve
 
     let mut o0 = clip_multi(&lines, &outline2).clip;
 
-    o0 = binclip_multi(&o0, |(x, y), t| (rand() > t as f64 || rand() > t as f64)).clip;
+    o0 = binclip_multi(
+        &o0,
+        Rc::new(|(x, y), t| (rand() > t as f64 || rand() > t as f64)),
+    )
+    .clip;
 
     [curve0.clone(), curve1.rev()]
         .into_iter()
@@ -774,7 +778,7 @@ pub fn fin_adipose(curve: &Polyline, dx: f64, dy: f64, r: f64) -> (Polyline, Vec
     fn shape((x, y): Point, t: usize) -> bool {
         rand() < (t as f64 * PI).sin()
     }
-    out1 = binclip_multi(&out1, shape).clip;
+    out1 = binclip_multi(&out1, Rc::new(shape)).clip;
     return (cc, vec![out0].into_iter().chain(out1).collect());
 }
 
@@ -1633,24 +1637,29 @@ pub fn fish(arg: Params) -> Vec<Polyline> {
 
     f0 = clip_multi(&f0, &c1).dont_clip;
 
-    let sh2 = vec![];
+    let mut sh2 = vec![];
     if let Some(func) = pattern_func {
         if arg.scale_type > 1 {
-            sh2 = todo!(
-                "patternshade_shape(&poly_union(outline, &trsl_poly(c0, 0., 3.), None),3.5,func)"
+            sh2 = patternshade_shape(
+                &poly_union(&outline, &trsl_poly(&c0, 0., 3.), None),
+                3.5,
+                func,
             );
         } else {
-            sh2 = todo!("patternshade_shape(c0, 4.5, func)");
+            sh2 = patternshade_shape(&c0, 4.5, func);
         }
         sh2 = clip_multi(&sh2, &cf).dont_clip;
         sh2 = clip_multi(&sh2, &c1).dont_clip;
     }
 
-    let sh3 = [];
+    let mut sh3 = vec![];
     if arg.pattern_type == 4 {
-        sh3 = todo!("smalldot_shape(poly_union(outline, trsl_poly(c0, 0, 5)), arg.pattern_scale)");
-        sh3 = todo!("clip_multi(&sh3, &c1, ).dont_clip");
-        sh3 = todo!("clip_multi(&sh3, &cf, ).dont_clip");
+        sh3 = smalldot_shape(
+            &poly_union(&outline, &trsl_poly(&c0, 0., 5.), None),
+            arg.pattern_scale,
+        );
+        sh3 = clip_multi(&sh3, &c1).dont_clip;
+        sh3 = clip_multi(&sh3, &cf).dont_clip;
     }
     bd.extend(f0);
     bd.extend(f1);

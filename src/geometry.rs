@@ -432,7 +432,7 @@ pub fn poly_union(poly0: &Polyline, poly1: &Polyline, self_isect_opt: Option<boo
 
     pub fn check_concavity(poly: &Polyline, idx: usize) -> i64 {
         let n = poly.len();
-        let a = poly[(idx - 1 + n) % n];
+        let a = poly[(idx as i32 - 1 + n as i32) as usize % n];
         let b = poly[idx];
         let c = poly[(idx + 1) % n];
         let cw = get_side(a, b, c);
@@ -585,10 +585,13 @@ pub fn binclip(polyline: &Polyline, func: impl Fn(Point, usize) -> bool) -> Clip
     out.filter_empty()
 }
 
-pub fn binclip_multi(polylines: &Vec<Polyline>, f: fn(Point, usize) -> bool) -> ClipSegments {
+pub fn binclip_multi(
+    polylines: &Vec<Polyline>,
+    f: Rc<dyn Fn(Point, usize) -> bool>,
+) -> ClipSegments {
     let mut out = ClipSegments::default();
     for polyline in polylines {
-        out.extend(binclip(polyline, f));
+        out.extend(binclip(polyline, f.as_ref()));
     }
     return out;
 }
@@ -664,34 +667,37 @@ pub fn fill_shape(poly: &Polyline, step_opt: Option<f64>) -> Vec<Vec<(f64, f64)>
 
     return lines;
 }
-/*
 
-pub fn patternshade_shape(poly,step=5,pattern_func){
-  let bbox = get_boundingbox(poly);
-  bbox.x -= step;
-  bbox.y -= step;
-  bbox.w += step*2;
-  bbox.h += step*2;
-  let lines = [];
-  for i in -bbox.h/2; i < bbox.w; i+=step){
-    let x0 = bbox.x + i;
-    let y0 = bbox.y;
-    let x1 = bbox.x + i + bbox.h/2;
-    let y1 = bbox.y + bbox.h;
-    lines.push([[x0,y0],[x1,y1]]);
-  }
-  lines = clip_multi(lines,poly).clip;
+pub fn patternshade_shape(
+    poly: &Polyline,
+    step: f64,
+    pattern_func: Rc<dyn Fn((f64, f64)) -> bool>,
+) -> Vec<Polyline> {
+    let mut bbox = get_boundingbox(poly);
+    bbox.x -= step;
+    bbox.y -= step;
+    bbox.w += step * 2.;
+    bbox.h += step * 2.;
+    let mut lines = vec![];
+    for i in successors(Some(-bbox.h / 2.), |i| {
+        let next = i + step;
+        (next < bbox.w).then_some(next)
+    }) {
+        let x0 = bbox.x + i;
+        let y0 = bbox.y;
+        let x1 = bbox.x + i + bbox.h / 2.;
+        let y1 = bbox.y + bbox.h;
+        lines.push(vec![(x0, y0), (x1, y1)]);
+    }
+    lines = clip_multi(&lines, poly).clip;
 
-  for i in 0..lines.len() {
-    lines[i] = resample(lines[i],2);
-  }
+    for i in 0..lines.len() {
+        lines[i] = resample(&lines[i], 2.);
+    }
 
-  lines = clip_multi(lines,pattern_func,binclip).clip;
-
-  return lines;
+    binclip_multi(&lines, Rc::new(move |p, _| pattern_func(p))).clip
 }
 
-*/
 pub fn vein_shape(poly: &Polyline, n_opt: Option<i64>) -> Vec<Polyline> {
     let n = n_opt.unwrap_or(50);
     let bbox = get_boundingbox(poly);
@@ -712,42 +718,37 @@ pub fn vein_shape(poly: &Polyline, n_opt: Option<i64>) -> Vec<Polyline> {
     out = clip_multi(&out, poly).clip;
     return out;
 }
-/*
-pub fn smalldot_shape(poly,scale=1){
-  let samples = [];
-  let bbox = get_boundingbox(poly);
-  poissondisk(bbox.w,bbox.h,5*scale,samples);
-  for i in 0..samples.len() {
-    samples[i][0] += bbox.x;
-    samples[i][1] += bbox.y;
-  }
-  let out = [];
-  let n = 7;
-  for i in 0..samples.len() {
-    let [x,y] =samples[i]
-    let t = (y > 0) ? (y/300) : 0.5;
-    // console.log(y,t);
-    if ((t > 0.4 || y < 0) && t > rand()){
-      continue;
+pub fn smalldot_shape(poly: &Polyline, scale: f64) -> Vec<Polyline> {
+    let mut samples = vec![];
+    let bbox = get_boundingbox(poly);
+    poissondisk(bbox.w, bbox.h, 5. * scale, &mut samples);
+    for i in 0..samples.len() {
+        samples[i].0 += bbox.x;
+        samples[i].1 += bbox.y;
     }
-    for k in 0; k < 2; k++){
-      let o = [];
-      for j in 0..n {
-        let t = j/(n-1);
-        let a = t * PI * 2;
-        o.push([
-          Math.cos(a)*1-k*0.3,
-          Math.sin(a)*0.5-k*0.3,
-        ])
-      }
-      o = trsl_poly(rot_poly(o,rand()*PI*2),x,y);
-      out.push(o);
+    let mut out = vec![];
+    let n = 7;
+    for (x, y) in samples {
+        let t = if (y > 0.) { (y / 300.) } else { 0.5 };
+        // console.log(y,t);
+        if ((t > 0.4 || y < 0.) && t > rand()) {
+            continue;
+        }
+        for k in 0..2 {
+            let mut o = vec![];
+            for j in 0..n {
+                let t = j / (n - 1);
+                let a = t as f64 * PI * 2.;
+                o.push((
+                    f64::cos(a) * 1. - k as f64 * 0.3,
+                    f64::sin(a) * 0.5 - k as f64 * 0.3,
+                ))
+            }
+            out.push(trsl_poly(&rot_poly(&o, rand() * PI * 2.), x, y));
+        }
     }
-
-  }
-  return clip_multi(out,poly).clip;
+    clip_multi(&out, poly).clip
 }
-*/
 
 pub fn isect_circ_line((cx, cy): Point, r: f64, (x0, y0): Point, (x1, y1): Point) -> Option<f64> {
     //https://stackoverflow.com/a/1084899
