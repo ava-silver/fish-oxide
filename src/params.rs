@@ -118,8 +118,7 @@ pub fn generate_params() -> Params {
     arg.scale_scale = rndtri_f(0.8, 1., 1.5);
     arg.pattern_type = *choice(&[0, 1, 2, 3, 4], None);
     arg.pattern_scale = rndtri_f(0.5, 1., 2.);
-    // arg.dorsal_texture_type = *choice(&[0, 1], None); TODO: fix this
-    arg.dorsal_texture_type = 0;
+    arg.dorsal_texture_type = *choice(&[0, 1], None);
     arg.dorsal_type = *choice(&[0, 1], None);
     arg.dorsal_length = rndtri_f(30., 90., 180.);
     if arg.dorsal_type == 0 {
