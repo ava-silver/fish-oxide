@@ -128,8 +128,7 @@ pub fn generate_params() -> Params {
         arg.dorsal_start = !!rndtri(11, 12, 16) as usize;
         arg.dorsal_end = !!rndtri(19, 21, 24) as usize;
     }
-    // arg.wing_texture_type = *choice(&[0, 1], None); TODO: fix this
-    arg.wing_texture_type = 0;
+    arg.wing_texture_type = *choice(&[0, 1], None);
     arg.wing_type = *choice(&[0, 1], None);
     if arg.wing_type == 0 {
         arg.wing_length = rndtri_f(40., 130., 200.);

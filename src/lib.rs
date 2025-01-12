@@ -2,6 +2,7 @@
 use clap::ValueEnum;
 use custom_rand::{seed_rand, str_to_seed};
 use draw::{cleanup, draw_svg, fish, reframe};
+use hershey::binomen;
 
 pub use crate::params::generate_params;
 pub use crate::params::Params;
@@ -20,8 +21,6 @@ pub enum Format {
     Csv,
     Ps,
 }
-
-const DEFAULT_SEED: &str = "x11:11 make a fish";
 
 pub fn generate(
     format: Format,
@@ -63,21 +62,16 @@ pub fn generate(
 }
 
 pub fn generate_svg() -> String {
-    generate(
-        Format::Svg,
-        DEFAULT_SEED.to_string(),
-        Some(DEFAULT_SEED.to_string()),
-        None,
-        Some(20.),
-        None,
-    )
+    let seed = binomen();
+    generate(Format::Svg, seed.clone(), Some(seed), None, Some(20.), None)
 }
 
 pub fn generate_json() -> String {
+    let seed = binomen();
     generate(
         Format::Json,
-        DEFAULT_SEED.to_string(),
-        Some(DEFAULT_SEED.to_string()),
+        seed.clone(),
+        Some(seed),
         None,
         Some(20.),
         None,
@@ -85,12 +79,11 @@ pub fn generate_json() -> String {
 }
 
 pub fn generate_csv() -> String {
-    generate(
-        Format::Csv,
-        DEFAULT_SEED.to_string(),
-        Some(DEFAULT_SEED.to_string()),
-        None,
-        Some(20.),
-        None,
-    )
+    let seed = binomen();
+    generate(Format::Csv, seed.clone(), Some(seed), None, Some(20.), None)
+}
+
+pub fn generate_raw() -> Vec<Vec<(f64, f64)>> {
+    let seed = binomen();
+    cleanup(reframe(fish(generate_params()), Some(20.), Some(seed)))
 }
