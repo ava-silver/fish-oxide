@@ -2,6 +2,7 @@
 use clap::{command, Parser};
 use core::f64;
 use fish_oxide::{generate, Format};
+use hershey::binomen;
 
 pub mod custom_rand;
 pub mod draw;
@@ -25,7 +26,7 @@ pub struct Cli {
 
 fn main() {
     let args = Cli::parse();
-    let seed = args.seed.unwrap_or("binomen()".to_string());
+    let seed = args.seed.unwrap_or(binomen());
     let format = args.format.unwrap_or(Format::Svg);
 
     println!(

@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-use regex::Regex;
-
 use crate::custom_rand::choice;
 use crate::custom_rand::rand;
 
@@ -121,9 +119,28 @@ pub fn binomen() -> String {
         name += &choice(&data[4], Some(&freq[4]));
     }
     name += &choice(&data[5], Some(&freq[5]));
-    let re = Regex::new(r"([A-Z])\1\1+").unwrap();
 
-    name = re.replace_all(&name, "$1$1").into_owned();
+    // workaround for regex not supporting backreferences:
+    // let re = Regex::new(r"([A-Z])\1\1+").unwrap();
+    // name = re.replace_all(&name, "$1$1").into_owned();
+
+    let mut result = String::new();
+    let mut chars = name.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        result.push(c);
+        if chars.peek() == Some(&c) {
+            result.push(c);
+            while chars.peek() == Some(&c) {
+                chars.next();
+            }
+        }
+    }
+
+    name = result;
+
+    // end workaround
+
     let mut chars = name.chars();
     return format!(
         "{}{}",
