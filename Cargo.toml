@@ -1,6 +1,6 @@
 [package]
 name = "fish-oxide"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 description = "A port of fishdraw to rust"
 license = "MIT"
@@ -10,6 +10,6 @@ repository = "https://github.com/ava-silver/fish-oxide"
 categories = ["command-line-utilities", "graphics", "multimedia::images"]
 
 [dependencies]
-clap = { version = "4.5.26", features = ["derive"] }
-serde_json = "1.0.135"
+clap = { version = "4.5.27", features = ["derive"] }
+serde_json = "1.0.137"
 rand = "0.8.4"
