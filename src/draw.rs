@@ -128,8 +128,8 @@ fn squama_mask(w: f64, h: f64) -> Polyline {
     let mut p = vec![];
     let n = 7;
     for i in 0..n {
-        let t = i / n;
-        let a = t as f64 * PI * 2.;
+        let t = i as f64 / n as f64;
+        let a = t * PI * 2.;
         let x = -pow(a.cos(), 1.3) * w;
         let y = pow(a.sin(), 1.3) * h;
         p.push((x, y));
@@ -596,15 +596,15 @@ pub fn fin_b(
     for i in 0..curve.len() {
         if (i == 0) {
             angs.push(
-                f64::atan2(curve[i + 1].1 - curve[i].1, curve[i + 1].1 - curve[i].1) - PI / 2.,
+                f64::atan2(curve[i + 1].1 - curve[i].1, curve[i + 1].0 - curve[i].0) - (PI / 2.),
             );
         } else if (i == curve.len() - 1) {
             angs.push(
-                f64::atan2(curve[i].1 - curve[i - 1].1, curve[i].1 - curve[i - 1].1) - PI / 2.,
+                f64::atan2(curve[i].1 - curve[i - 1].1, curve[i].0 - curve[i - 1].0) - (PI / 2.),
             );
         } else {
-            let a0 = f64::atan2(curve[i - 1].1 - curve[i].1, curve[i - 1].1 - curve[i].1);
-            let mut a1 = f64::atan2(curve[i + 1].1 - curve[i].1, curve[i + 1].1 - curve[i].1);
+            let a0 = f64::atan2(curve[i - 1].1 - curve[i].1, curve[i - 1].0 - curve[i].0);
+            let mut a1 = f64::atan2(curve[i + 1].1 - curve[i].1, curve[i + 1].0 - curve[i].0);
             while (a1 > a0) {
                 a1 -= PI * 2.;
             }
@@ -619,7 +619,7 @@ pub fn fin_b(
     let mut out2 = vec![];
     let mut out3 = vec![];
     for i in 0..curve.len() {
-        let t = (i / (curve.len() - 1)) as f64;
+        let t = (i as f64 / (curve.len() - 1) as f64);
         let aa = lerp(ang0, ang1, t);
         let a = angs[i] + aa;
         let w = func(t);
@@ -629,21 +629,21 @@ pub fn fin_b(
         let y1 = y0 + f64::sin(a) * w;
 
         let b = (
-            x1 + 0.5 * f64::cos(a - PI / 2.),
-            y1 + 0.5 * f64::sin(a - PI / 2.),
+            x1 + 0.5 * f64::cos(a - (PI / 2.)),
+            y1 + 0.5 * f64::sin(a - (PI / 2.)),
         );
         let c = (
-            x1 + 0.5 * f64::cos(a + PI / 2.),
-            y1 + 0.5 * f64::sin(a + PI / 2.),
+            x1 + 0.5 * f64::cos(a + (PI / 2.)),
+            y1 + 0.5 * f64::sin(a + (PI / 2.)),
         );
 
         let p = (
-            curve[i].0 + 1.8 * f64::cos(a - PI / 2.),
-            curve[i].1 + 1.8 * f64::sin(a - PI / 2.),
+            curve[i].0 + 1.8 * f64::cos(a - (PI / 2.)),
+            curve[i].1 + 1.8 * f64::sin(a - (PI / 2.)),
         );
         let q = (
-            curve[i].0 + 1.8 * f64::cos(a + PI / 2.),
-            curve[i].1 + 1.8 * f64::sin(a + PI / 2.),
+            curve[i].0 + 1.8 * f64::cos(a + (PI / 2.)),
+            curve[i].1 + 1.8 * f64::sin(a + (PI / 2.)),
         );
         out1.push((x1, y1));
         out0.push(vec![p, b, c, q]);
@@ -661,12 +661,12 @@ pub fn fin_b(
         let ang = f64::atan2(c.1 - b.1, c.0 - b.0);
 
         for j in 0..n {
-            let t = (j / (n - 1)) as f64;
+            let t = (j as f64 / (n - 1) as f64);
             let d = f64::sin(t * PI) * 2.;
             let a = lerp2d(b, c, t);
             o.push((
-                a.0 + f64::cos(ang + PI / 2.) * d,
-                a.1 + f64::sin(ang + PI / 2.) * d,
+                a.0 + f64::cos(ang + (PI / 2.)) * d,
+                a.1 + f64::sin(ang + (PI / 2.)) * d,
             ))
         }
 
@@ -808,8 +808,8 @@ pub fn fish_lip((mut x0, mut y0): Point, (mut x1, mut y1): Point, w: f64) -> Pol
     let dy = f64::sin(a0 + PI / 2.) * 0.5;
     let mut o = vec![(x0 - dx, y0 - dy)];
     for i in 0..n {
-        let t = i / (n - 1);
-        let a = lerp(ang, PI * 2. - ang, t as f64) + a0;
+        let t = i as f64 / (n - 1) as f64;
+        let a = lerp(ang, PI * 2. - ang, t) + a0;
         let x = -f64::cos(a) * w + x1;
         let y = -f64::sin(a) * w + y1;
         o.push((x, y));
@@ -994,8 +994,8 @@ pub fn barbel((mut x, mut y): Point, n: usize, mut ang: f64, dd_opt: Option<f64>
     let mut o0 = vec![];
     let mut o1 = vec![];
     for i in 0..n - 1 {
-        let t = i / (n - 1);
-        let w = 1.5 * (1. - t as f64);
+        let t = i as f64 / (n - 1) as f64;
+        let w = 1.5 * (1. - t);
 
         let b = curve[i];
         let c = curve[i + 1];
@@ -1723,7 +1723,7 @@ pub fn reframe(
     let h = (300. - pad * 2.) - (if text.is_some() { 10. } else { 0. });
     let bbox = get_boundingbox(&flat(&polylines));
     let sw = w / bbox.w;
-    let sh = h as f64 / bbox.h;
+    let sh = h / bbox.h;
     let s = sw.min(sh);
     let px = (w - bbox.w * s) / 2.;
     let py = (h - bbox.h * s) / 2.;
